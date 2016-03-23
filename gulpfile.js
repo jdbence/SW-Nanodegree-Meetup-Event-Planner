@@ -6,6 +6,7 @@ var gulp = require('gulp'),
   concat = require('gulp-concat'),
   bable = require('gulp-babel'),
   sourcemaps = require('gulp-sourcemaps'),
+  vulcanize = require('gulp-vulcanize'),
   browserSync = require('browser-sync'),
   reload = browserSync.reload,
   del = require('del'),
@@ -81,6 +82,7 @@ gulp.task('live', function () {
       baseDir: [config.dist],
       routes: {
         '/node_modules': 'node_modules',
+        '/bower_components': 'bower_components',
         '/styles': 'dist/styles'
       }
     }
@@ -92,9 +94,19 @@ gulp.task('live', function () {
   //   config.dist + '/js/**/*.js'
   // ]).on('change', reload);
   // changes in src should recompile and reload
-  gulp.watch(config.src + '/*.html', ['html', reload]);
+  gulp.watch(config.src + '/**/*.html', ['html', 'vulcanize', reload]);
   gulp.watch(config.src + '/js/**/*.js', ['lint', 'scripts', reload]);
   gulp.watch(config.src + '/styles/**/*.scss', ['styles', reload]);
+});
+
+gulp.task('vulcanize', function() {
+  return gulp.src(config.src + '/elements/elements.html')
+    .pipe(vulcanize({
+      stripComments: true,
+      inlineCss: true,
+      inlineScripts: true
+    }))
+    .pipe(gulp.dest(config.dist + '/elements'))
 });
 
 // removes all files from the dist folder

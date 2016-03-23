@@ -9,8 +9,46 @@
     
     <link href="styles/style.css" rel="stylesheet" />
   </head>
-  <body>
-    <h1>Hello World</h1>
+  <body class="vertical layout" style="background-color: #dddddd;">
+    <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+    
+    <link rel="import" href="elements/elements.html">
+    
+    <paper-drawer-panel>
+      <paper-header-panel drawer>
+        <paper-toolbar>
+          <div>Meet-up Event Planner</div>
+        </paper-toolbar>
+        <paper-menu>
+          <paper-item>This is content 1</paper-item>
+          <paper-item>This is content 2</paper-item>
+          <paper-item>This is content 3</paper-item>
+        </paper-menu>
+      </paper-header-panel>
+      
+      <paper-header-panel main>
+        <paper-toolbar>
+          <paper-button>
+            <iron-icon icon="menu" paper-drawer-toggle/>
+          </paper-button>
+          <div>Title</div>
+        </paper-toolbar>
+        <paper-material style="background-color: white; overflow: auto;">
+          <h1>Hello World</h1>
+          <input list="list"/>
+          <datalist id="list">
+            <option value="Party"/>
+            <option value="Meeting"/>
+            <option value="Conference Talk"/>
+            <option value="Sports Game"/>
+          </datalist>
+          <label for="phone">
+            <span>Telephone Number</span>
+            <input type="tel" id="phone" placeHolder="test" autofocus />
+          </label>
+        </paper-material>
+      </paper-header-panel>
+    </paper-drawer-panel>
     <script src="js/all.js"></script>
   </body>
 </html>
