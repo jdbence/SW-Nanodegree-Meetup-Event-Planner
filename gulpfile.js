@@ -1,13 +1,30 @@
 var gulp = require('gulp'),
   sass = require('gulp-sass'),
   prefixer = require('gulp-autoprefixer'),
+  eslint = require('gulp-eslint'),
   browserSync = require('browser-sync'),
   reload = browserSync.reload,
   del = require('del'),
   config = require('./config');
 
 // builds html and styles
-gulp.task('default', ['html', 'styles']);
+gulp.task('default', ['lint', 'html', 'styles']);
+
+// lint JS files when attempting to commit changes to git
+gulp.task('pre-commit', ['lint']);
+
+// lint JS files
+gulp.task('lint', function () {
+  return gulp.src([
+      config.src + '/js/**/*.js',
+      '!' + config.src + '/js/config.js',
+      '!' + config.src + '/js/vendor/**/*.js'
+  ])
+    .pipe(reload({stream: true, once: true}))
+    .pipe(eslint())
+    .pipe(eslint.format('stylish'))
+    .pipe(eslint.failAfterError());
+});
 
 // copy html to dist folder
 gulp.task('html', function () {
@@ -35,7 +52,7 @@ gulp.task('live', function(){
       port: 8081
     },
     server: {
-      baseDir: [config.src],
+      baseDir: [config.tmp, config.src],
       routes: {
         '/node_modules': 'node_modules',
         '/styles': 'dist/styles'
@@ -46,7 +63,8 @@ gulp.task('live', function(){
   gulp.watch([
     config.src + '/*.html',
     config.src + '/js/**/*.js',
-    config.src + '/img/**/*'
+    config.src + '/img/**/*',
+    config.tmp + '/js/**/*.js'
   ]).on('change', reload);
   gulp.watch(config.src + '/styles/**/*.scss', ['styles', reload]);
 });
