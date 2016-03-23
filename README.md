@@ -9,13 +9,18 @@ SPA allows users to create new meetup events
 [clone-ghwin]: github-windows://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
 [clone-ghmac]: github-mac://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
 [gulp]: http://gulpjs.com
-[browsersync]: https://www.browsersync.io/
+[browsersync]: https://www.browsersync.io
+[style-commit]: https://udacity.github.io/git-styleguide
+[style-js]: http://google.github.io/styleguide/javascriptguide.xml
 
 [Live Example][example]
 
 ## Includes
 
 [Gulp][gulp], [Browsersync][browsersync]
+
+## Collaboration
+[Udacity Commit Styleguide][style-commit], [ESLint Google Styleguide][style-js]
 
 ## Installation
 

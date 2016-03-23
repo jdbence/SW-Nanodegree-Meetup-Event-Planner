@@ -1,0 +1,1 @@
+{"version":3,"sources":["app.js"],"names":[],"mappings":";;;;IAAM,MAEJ,SAFI,GAEJ,GAAc;wBAFV,KAEU;;OADd,OAAO,qBACO;;AACZ,UAAQ,GAAR,CAAY,wBAAwB,KAAK,IAAL,CAApC,CADY;CAAd;;AAKF,IAAI,GAAJ","file":"all.js","sourcesContent":["class App {\n  name = 'Super Awesome App!';\n  constructor() {\n    console.log('App.constructor(): ' + this.name)\n  }\n}\n\nnew App()"],"sourceRoot":"/source/"}

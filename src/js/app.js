@@ -1,4 +1,8 @@
-var App = {
-  name: 'Super Awesome App'
-};
-module.exports = App;
+class App {
+  name = 'Super Awesome App!';
+  constructor() {
+    console.log('App.constructor(): ' + this.name)
+  }
+}
+
+new App()

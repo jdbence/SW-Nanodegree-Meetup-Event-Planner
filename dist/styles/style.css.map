@@ -1,0 +1,1 @@
+{"version":3,"sources":["style.scss"],"names":[],"mappings":"AAAA,UAEE,SACA,SAAW,CACZ","file":"style.css","sourcesContent":["html,\nbody {\n  margin: 0;\n  padding: 0;\n}"],"sourceRoot":"/source/"}
