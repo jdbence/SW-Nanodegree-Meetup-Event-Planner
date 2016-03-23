@@ -1,8 +1,17 @@
 # SW-Nanodegree-Meetup-Event-Planner
 SPA allows users to create new meetup events
 
+[example]: https://jdbence.github.io/SW-Nanodegree-Meetup-Event-Planner/dist/index.html
+[get-zip]: https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner/archive/master.zip
+[get-tgz]: https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner/archive/master.tar.gz
+[clone-http]: https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner.git
+[clone-svn]: https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
+[clone-ghwin]: github-windows://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
+[clone-ghmac]: github-mac://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
 [gulp]: http://gulpjs.com
 [browsersync]: https://www.browsersync.io/
+
+[Live Example][example]
 
 ## Includes
 
@@ -17,11 +26,7 @@ SPA allows users to create new meetup events
 ### Gulp Dependencies
 
 ```node
-//  Move into project folder
-cd project5/
-//  Install globals
-npm install gulp -g
-//  Install local dependences
+//  Install local dependencies
 npm install
 ```
 
