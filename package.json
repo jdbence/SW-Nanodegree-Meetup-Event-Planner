@@ -43,5 +43,8 @@
   "eslintConfig": {
     "extends": "google"
   },
-  "precommit": "gulp pre-commit"
+  "precommit": "gulp pre-commit",
+  "dependencies": {
+    "connect-history-api-fallback": "^1.2.0"
+  }
 }

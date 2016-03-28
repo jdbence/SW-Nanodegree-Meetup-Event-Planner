@@ -1,5 +1,13 @@
 <html><head><!--
 @license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+--><!--
+@license
 Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
@@ -13103,6 +13111,4044 @@ this.fire('dom-change');
     });
   </script>
 </dom-module>
-</div><lint rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
 
-<lint rel="import" href="events-app/events-app.html"></lint></lint></body></html>
+
+<dom-module id="paper-ripple" assetpath="../../bower_components/paper-ripple/">
+
+  
+
+  <template>
+    <style>
+      :host {
+        display: block;
+        position: absolute;
+        border-radius: inherit;
+        overflow: hidden;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+
+        /* See PolymerElements/paper-behaviors/issues/34. On non-Chrome browsers,
+         * creating a node (with a position:absolute) in the middle of an event
+         * handler "interrupts" that event handler (which happens when the
+         * ripple is created on demand) */
+        pointer-events: none;
+      }
+
+      :host([animating]) {
+        /* This resolves a rendering issue in Chrome (as of 40) where the
+           ripple is not properly clipped by its parent (which may have
+           rounded corners). See: http://jsbin.com/temexa/4
+
+           Note: We only apply this style conditionally. Otherwise, the browser
+           will create a new compositing layer for every ripple element on the
+           page, and that would be bad. */
+        -webkit-transform: translate(0, 0);
+        transform: translate3d(0, 0, 0);
+      }
+
+      #background,
+      #waves,
+      .wave-container,
+      .wave {
+        pointer-events: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #background,
+      .wave {
+        opacity: 0;
+      }
+
+      #waves,
+      .wave {
+        overflow: hidden;
+      }
+
+      .wave-container,
+      .wave {
+        border-radius: 50%;
+      }
+
+      :host(.circle) #background,
+      :host(.circle) #waves {
+        border-radius: 50%;
+      }
+
+      :host(.circle) .wave-container {
+        overflow: hidden;
+      }
+    </style>
+
+    <div id="background"></div>
+    <div id="waves"></div>
+  </template>
+</dom-module>
+<script>
+  (function() {
+    var Utility = {
+      distance: function(x1, y1, x2, y2) {
+        var xDelta = (x1 - x2);
+        var yDelta = (y1 - y2);
+
+        return Math.sqrt(xDelta * xDelta + yDelta * yDelta);
+      },
+
+      now: window.performance && window.performance.now ?
+          window.performance.now.bind(window.performance) : Date.now
+    };
+
+    /**
+     * @param {HTMLElement} element
+     * @constructor
+     */
+    function ElementMetrics(element) {
+      this.element = element;
+      this.width = this.boundingRect.width;
+      this.height = this.boundingRect.height;
+
+      this.size = Math.max(this.width, this.height);
+    }
+
+    ElementMetrics.prototype = {
+      get boundingRect () {
+        return this.element.getBoundingClientRect();
+      },
+
+      furthestCornerDistanceFrom: function(x, y) {
+        var topLeft = Utility.distance(x, y, 0, 0);
+        var topRight = Utility.distance(x, y, this.width, 0);
+        var bottomLeft = Utility.distance(x, y, 0, this.height);
+        var bottomRight = Utility.distance(x, y, this.width, this.height);
+
+        return Math.max(topLeft, topRight, bottomLeft, bottomRight);
+      }
+    };
+
+    /**
+     * @param {HTMLElement} element
+     * @constructor
+     */
+    function Ripple(element) {
+      this.element = element;
+      this.color = window.getComputedStyle(element).color;
+
+      this.wave = document.createElement('div');
+      this.waveContainer = document.createElement('div');
+      this.wave.style.backgroundColor = this.color;
+      this.wave.classList.add('wave');
+      this.waveContainer.classList.add('wave-container');
+      Polymer.dom(this.waveContainer).appendChild(this.wave);
+
+      this.resetInteractionState();
+    }
+
+    Ripple.MAX_RADIUS = 300;
+
+    Ripple.prototype = {
+      get recenters() {
+        return this.element.recenters;
+      },
+
+      get center() {
+        return this.element.center;
+      },
+
+      get mouseDownElapsed() {
+        var elapsed;
+
+        if (!this.mouseDownStart) {
+          return 0;
+        }
+
+        elapsed = Utility.now() - this.mouseDownStart;
+
+        if (this.mouseUpStart) {
+          elapsed -= this.mouseUpElapsed;
+        }
+
+        return elapsed;
+      },
+
+      get mouseUpElapsed() {
+        return this.mouseUpStart ?
+          Utility.now () - this.mouseUpStart : 0;
+      },
+
+      get mouseDownElapsedSeconds() {
+        return this.mouseDownElapsed / 1000;
+      },
+
+      get mouseUpElapsedSeconds() {
+        return this.mouseUpElapsed / 1000;
+      },
+
+      get mouseInteractionSeconds() {
+        return this.mouseDownElapsedSeconds + this.mouseUpElapsedSeconds;
+      },
+
+      get initialOpacity() {
+        return this.element.initialOpacity;
+      },
+
+      get opacityDecayVelocity() {
+        return this.element.opacityDecayVelocity;
+      },
+
+      get radius() {
+        var width2 = this.containerMetrics.width * this.containerMetrics.width;
+        var height2 = this.containerMetrics.height * this.containerMetrics.height;
+        var waveRadius = Math.min(
+          Math.sqrt(width2 + height2),
+          Ripple.MAX_RADIUS
+        ) * 1.1 + 5;
+
+        var duration = 1.1 - 0.2 * (waveRadius / Ripple.MAX_RADIUS);
+        var timeNow = this.mouseInteractionSeconds / duration;
+        var size = waveRadius * (1 - Math.pow(80, -timeNow));
+
+        return Math.abs(size);
+      },
+
+      get opacity() {
+        if (!this.mouseUpStart) {
+          return this.initialOpacity;
+        }
+
+        return Math.max(
+          0,
+          this.initialOpacity - this.mouseUpElapsedSeconds * this.opacityDecayVelocity
+        );
+      },
+
+      get outerOpacity() {
+        // Linear increase in background opacity, capped at the opacity
+        // of the wavefront (waveOpacity).
+        var outerOpacity = this.mouseUpElapsedSeconds * 0.3;
+        var waveOpacity = this.opacity;
+
+        return Math.max(
+          0,
+          Math.min(outerOpacity, waveOpacity)
+        );
+      },
+
+      get isOpacityFullyDecayed() {
+        return this.opacity < 0.01 &&
+          this.radius >= Math.min(this.maxRadius, Ripple.MAX_RADIUS);
+      },
+
+      get isRestingAtMaxRadius() {
+        return this.opacity >= this.initialOpacity &&
+          this.radius >= Math.min(this.maxRadius, Ripple.MAX_RADIUS);
+      },
+
+      get isAnimationComplete() {
+        return this.mouseUpStart ?
+          this.isOpacityFullyDecayed : this.isRestingAtMaxRadius;
+      },
+
+      get translationFraction() {
+        return Math.min(
+          1,
+          this.radius / this.containerMetrics.size * 2 / Math.sqrt(2)
+        );
+      },
+
+      get xNow() {
+        if (this.xEnd) {
+          return this.xStart + this.translationFraction * (this.xEnd - this.xStart);
+        }
+
+        return this.xStart;
+      },
+
+      get yNow() {
+        if (this.yEnd) {
+          return this.yStart + this.translationFraction * (this.yEnd - this.yStart);
+        }
+
+        return this.yStart;
+      },
+
+      get isMouseDown() {
+        return this.mouseDownStart && !this.mouseUpStart;
+      },
+
+      resetInteractionState: function() {
+        this.maxRadius = 0;
+        this.mouseDownStart = 0;
+        this.mouseUpStart = 0;
+
+        this.xStart = 0;
+        this.yStart = 0;
+        this.xEnd = 0;
+        this.yEnd = 0;
+        this.slideDistance = 0;
+
+        this.containerMetrics = new ElementMetrics(this.element);
+      },
+
+      draw: function() {
+        var scale;
+        var translateString;
+        var dx;
+        var dy;
+
+        this.wave.style.opacity = this.opacity;
+
+        scale = this.radius / (this.containerMetrics.size / 2);
+        dx = this.xNow - (this.containerMetrics.width / 2);
+        dy = this.yNow - (this.containerMetrics.height / 2);
+
+
+        // 2d transform for safari because of border-radius and overflow:hidden clipping bug.
+        // https://bugs.webkit.org/show_bug.cgi?id=98538
+        this.waveContainer.style.webkitTransform = 'translate(' + dx + 'px, ' + dy + 'px)';
+        this.waveContainer.style.transform = 'translate3d(' + dx + 'px, ' + dy + 'px, 0)';
+        this.wave.style.webkitTransform = 'scale(' + scale + ',' + scale + ')';
+        this.wave.style.transform = 'scale3d(' + scale + ',' + scale + ',1)';
+      },
+
+      /** @param {Event=} event */
+      downAction: function(event) {
+        var xCenter = this.containerMetrics.width / 2;
+        var yCenter = this.containerMetrics.height / 2;
+
+        this.resetInteractionState();
+        this.mouseDownStart = Utility.now();
+
+        if (this.center) {
+          this.xStart = xCenter;
+          this.yStart = yCenter;
+          this.slideDistance = Utility.distance(
+            this.xStart, this.yStart, this.xEnd, this.yEnd
+          );
+        } else {
+          this.xStart = event ?
+              event.detail.x - this.containerMetrics.boundingRect.left :
+              this.containerMetrics.width / 2;
+          this.yStart = event ?
+              event.detail.y - this.containerMetrics.boundingRect.top :
+              this.containerMetrics.height / 2;
+        }
+
+        if (this.recenters) {
+          this.xEnd = xCenter;
+          this.yEnd = yCenter;
+          this.slideDistance = Utility.distance(
+            this.xStart, this.yStart, this.xEnd, this.yEnd
+          );
+        }
+
+        this.maxRadius = this.containerMetrics.furthestCornerDistanceFrom(
+          this.xStart,
+          this.yStart
+        );
+
+        this.waveContainer.style.top =
+          (this.containerMetrics.height - this.containerMetrics.size) / 2 + 'px';
+        this.waveContainer.style.left =
+          (this.containerMetrics.width - this.containerMetrics.size) / 2 + 'px';
+
+        this.waveContainer.style.width = this.containerMetrics.size + 'px';
+        this.waveContainer.style.height = this.containerMetrics.size + 'px';
+      },
+
+      /** @param {Event=} event */
+      upAction: function(event) {
+        if (!this.isMouseDown) {
+          return;
+        }
+
+        this.mouseUpStart = Utility.now();
+      },
+
+      remove: function() {
+        Polymer.dom(this.waveContainer.parentNode).removeChild(
+          this.waveContainer
+        );
+      }
+    };
+
+    Polymer({
+      is: 'paper-ripple',
+
+      behaviors: [
+        Polymer.IronA11yKeysBehavior
+      ],
+
+      properties: {
+        /**
+         * The initial opacity set on the wave.
+         *
+         * @attribute initialOpacity
+         * @type number
+         * @default 0.25
+         */
+        initialOpacity: {
+          type: Number,
+          value: 0.25
+        },
+
+        /**
+         * How fast (opacity per second) the wave fades out.
+         *
+         * @attribute opacityDecayVelocity
+         * @type number
+         * @default 0.8
+         */
+        opacityDecayVelocity: {
+          type: Number,
+          value: 0.8
+        },
+
+        /**
+         * If true, ripples will exhibit a gravitational pull towards
+         * the center of their container as they fade away.
+         *
+         * @attribute recenters
+         * @type boolean
+         * @default false
+         */
+        recenters: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, ripples will center inside its container
+         *
+         * @attribute recenters
+         * @type boolean
+         * @default false
+         */
+        center: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * A list of the visual ripples.
+         *
+         * @attribute ripples
+         * @type Array
+         * @default []
+         */
+        ripples: {
+          type: Array,
+          value: function() {
+            return [];
+          }
+        },
+
+        /**
+         * True when there are visible ripples animating within the
+         * element.
+         */
+        animating: {
+          type: Boolean,
+          readOnly: true,
+          reflectToAttribute: true,
+          value: false
+        },
+
+        /**
+         * If true, the ripple will remain in the "down" state until `holdDown`
+         * is set to false again.
+         */
+        holdDown: {
+          type: Boolean,
+          value: false,
+          observer: '_holdDownChanged'
+        },
+
+        /**
+         * If true, the ripple will not generate a ripple effect
+         * via pointer interaction.
+         * Calling ripple's imperative api like `simulatedRipple` will
+         * still generate the ripple effect.
+         */
+        noink: {
+          type: Boolean,
+          value: false
+        },
+
+        _animating: {
+          type: Boolean
+        },
+
+        _boundAnimate: {
+          type: Function,
+          value: function() {
+            return this.animate.bind(this);
+          }
+        }
+      },
+
+      get target () {
+        var ownerRoot = Polymer.dom(this).getOwnerRoot();
+        var target;
+
+        if (this.parentNode.nodeType == 11) { // DOCUMENT_FRAGMENT_NODE
+          target = ownerRoot.host;
+        } else {
+          target = this.parentNode;
+        }
+
+        return target;
+      },
+
+      keyBindings: {
+        'enter:keydown': '_onEnterKeydown',
+        'space:keydown': '_onSpaceKeydown',
+        'space:keyup': '_onSpaceKeyup'
+      },
+
+      attached: function() {
+        // Set up a11yKeysBehavior to listen to key events on the target,
+        // so that space and enter activate the ripple even if the target doesn't
+        // handle key events. The key handlers deal with `noink` themselves.
+        this.keyEventTarget = this.target;
+        this.listen(this.target, 'up', 'uiUpAction');
+        this.listen(this.target, 'down', 'uiDownAction');
+      },
+
+      detached: function() {
+        this.unlisten(this.target, 'up', 'uiUpAction');
+        this.unlisten(this.target, 'down', 'uiDownAction');
+      },
+
+      get shouldKeepAnimating () {
+        for (var index = 0; index < this.ripples.length; ++index) {
+          if (!this.ripples[index].isAnimationComplete) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+
+      simulatedRipple: function() {
+        this.downAction(null);
+
+        // Please see polymer/polymer#1305
+        this.async(function() {
+          this.upAction();
+        }, 1);
+      },
+
+      /**
+       * Provokes a ripple down effect via a UI event,
+       * respecting the `noink` property.
+       * @param {Event=} event
+       */
+      uiDownAction: function(event) {
+        if (!this.noink) {
+          this.downAction(event);
+        }
+      },
+
+      /**
+       * Provokes a ripple down effect via a UI event,
+       * *not* respecting the `noink` property.
+       * @param {Event=} event
+       */
+      downAction: function(event) {
+        if (this.holdDown && this.ripples.length > 0) {
+          return;
+        }
+
+        var ripple = this.addRipple();
+
+        ripple.downAction(event);
+
+        if (!this._animating) {
+          this.animate();
+        }
+      },
+
+      /**
+       * Provokes a ripple up effect via a UI event,
+       * respecting the `noink` property.
+       * @param {Event=} event
+       */
+      uiUpAction: function(event) {
+        if (!this.noink) {
+          this.upAction(event);
+        }
+      },
+
+      /**
+       * Provokes a ripple up effect via a UI event,
+       * *not* respecting the `noink` property.
+       * @param {Event=} event
+       */
+      upAction: function(event) {
+        if (this.holdDown) {
+          return;
+        }
+
+        this.ripples.forEach(function(ripple) {
+          ripple.upAction(event);
+        });
+
+        this.animate();
+      },
+
+      onAnimationComplete: function() {
+        this._animating = false;
+        this.$.background.style.backgroundColor = null;
+        this.fire('transitionend');
+      },
+
+      addRipple: function() {
+        var ripple = new Ripple(this);
+
+        Polymer.dom(this.$.waves).appendChild(ripple.waveContainer);
+        this.$.background.style.backgroundColor = ripple.color;
+        this.ripples.push(ripple);
+
+        this._setAnimating(true);
+
+        return ripple;
+      },
+
+      removeRipple: function(ripple) {
+        var rippleIndex = this.ripples.indexOf(ripple);
+
+        if (rippleIndex < 0) {
+          return;
+        }
+
+        this.ripples.splice(rippleIndex, 1);
+
+        ripple.remove();
+
+        if (!this.ripples.length) {
+          this._setAnimating(false);
+        }
+      },
+
+      animate: function() {
+        var index;
+        var ripple;
+
+        this._animating = true;
+
+        for (index = 0; index < this.ripples.length; ++index) {
+          ripple = this.ripples[index];
+
+          ripple.draw();
+
+          this.$.background.style.opacity = ripple.outerOpacity;
+
+          if (ripple.isOpacityFullyDecayed && !ripple.isRestingAtMaxRadius) {
+            this.removeRipple(ripple);
+          }
+        }
+
+        if (!this.shouldKeepAnimating && this.ripples.length === 0) {
+          this.onAnimationComplete();
+        } else {
+          window.requestAnimationFrame(this._boundAnimate);
+        }
+      },
+
+      _onEnterKeydown: function() {
+        this.uiDownAction();
+        this.async(this.uiUpAction, 1);
+      },
+
+      _onSpaceKeydown: function() {
+        this.uiDownAction();
+      },
+
+      _onSpaceKeyup: function() {
+        this.uiUpAction();
+      },
+
+      // note: holdDown does not respect noink since it can be a focus based
+      // effect.
+      _holdDownChanged: function(newVal, oldVal) {
+        if (oldVal === undefined) {
+          return;
+        }
+        if (newVal) {
+          this.downAction();
+        } else {
+          this.upAction();
+        }
+      }
+    });
+  })();
+</script>
+<script>
+
+  /**
+   * `Polymer.PaperRippleBehavior` dynamically implements a ripple
+   * when the element has focus via pointer or keyboard.
+   *
+   * NOTE: This behavior is intended to be used in conjunction with and after
+   * `Polymer.IronButtonState` and `Polymer.IronControlState`.
+   *
+   * @polymerBehavior Polymer.PaperRippleBehavior
+   */
+  Polymer.PaperRippleBehavior = {
+
+    properties: {
+      /**
+       * If true, the element will not produce a ripple effect when interacted
+       * with via the pointer.
+       */
+      noink: {
+        type: Boolean,
+        observer: '_noinkChanged'
+      },
+
+      /**
+       * @type {Element|undefined}
+       */
+      _rippleContainer: {
+        type: Object,
+      }
+    },
+
+    /**
+     * Ensures a `<paper-ripple>` element is available when the element is
+     * focused.
+     */
+    _buttonStateChanged: function() {
+      if (this.focused) {
+        this.ensureRipple();
+      }
+    },
+
+    /**
+     * In addition to the functionality provided in `IronButtonState`, ensures
+     * a ripple effect is created when the element is in a `pressed` state.
+     */
+    _downHandler: function(event) {
+      Polymer.IronButtonStateImpl._downHandler.call(this, event);
+      if (this.pressed) {
+        this.ensureRipple(event);
+      }
+    },
+
+    /**
+     * Ensures this element contains a ripple effect. For startup efficiency
+     * the ripple effect is dynamically on demand when needed.
+     * @param {!Event=} optTriggeringEvent (optional) event that triggered the
+     * ripple.
+     */
+    ensureRipple: function(optTriggeringEvent) {
+      if (!this.hasRipple()) {
+        this._ripple = this._createRipple();
+        this._ripple.noink = this.noink;
+        var rippleContainer = this._rippleContainer || this.root;
+        if (rippleContainer) {
+          Polymer.dom(rippleContainer).appendChild(this._ripple);
+        }
+        if (optTriggeringEvent) {
+          // Check if the event happened inside of the ripple container
+          // Fall back to host instead of the root because distributed text
+          // nodes are not valid event targets
+          var domContainer = Polymer.dom(this._rippleContainer || this);
+          var target = Polymer.dom(optTriggeringEvent).rootTarget;
+          if (domContainer.deepContains( /** @type {Node} */(target))) {
+            this._ripple.uiDownAction(optTriggeringEvent);
+          }
+        }
+      }
+    },
+
+    /**
+     * Returns the `<paper-ripple>` element used by this element to create
+     * ripple effects. The element's ripple is created on demand, when
+     * necessary, and calling this method will force the
+     * ripple to be created.
+     */
+    getRipple: function() {
+      this.ensureRipple();
+      return this._ripple;
+    },
+
+    /**
+     * Returns true if this element currently contains a ripple effect.
+     * @return {boolean}
+     */
+    hasRipple: function() {
+      return Boolean(this._ripple);
+    },
+
+    /**
+     * Create the element's ripple effect via creating a `<paper-ripple>`.
+     * Override this method to customize the ripple element.
+     * @return {!PaperRippleElement} Returns a `<paper-ripple>` element.
+     */
+    _createRipple: function() {
+      return /** @type {!PaperRippleElement} */ (
+          document.createElement('paper-ripple'));
+    },
+
+    _noinkChanged: function(noink) {
+      if (this.hasRipple()) {
+        this._ripple.noink = noink;
+      }
+    }
+
+  };
+
+</script>
+<script>
+
+  /**
+   * `Polymer.PaperInkyFocusBehavior` implements a ripple when the element has keyboard focus.
+   *
+   * @polymerBehavior Polymer.PaperInkyFocusBehavior
+   */
+  Polymer.PaperInkyFocusBehaviorImpl = {
+
+    observers: [
+      '_focusedChanged(receivedFocusFromKeyboard)'
+    ],
+
+    _focusedChanged: function(receivedFocusFromKeyboard) {
+      if (receivedFocusFromKeyboard) {
+        this.ensureRipple();
+      }
+      if (this.hasRipple()) {
+        this._ripple.holdDown = receivedFocusFromKeyboard;
+      }
+    },
+
+    _createRipple: function() {
+      var ripple = Polymer.PaperRippleBehavior._createRipple();
+      ripple.id = 'ink';
+      ripple.setAttribute('center', '');
+      ripple.classList.add('circle');
+      return ripple;
+    }
+
+  };
+
+  /** @polymerBehavior Polymer.PaperInkyFocusBehavior */
+  Polymer.PaperInkyFocusBehavior = [
+    Polymer.IronButtonState,
+    Polymer.IronControlState,
+    Polymer.PaperRippleBehavior,
+    Polymer.PaperInkyFocusBehaviorImpl
+  ];
+
+</script>
+
+
+<dom-module id="paper-icon-button" assetpath="../../bower_components/paper-icon-button/">
+  <template strip-whitespace="">
+    <style>
+      :host {
+        display: inline-block;
+        position: relative;
+        padding: 8px;
+        outline: none;
+        -webkit-tap-highlight-color: rgba(0,0,0,0);
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: pointer;
+        z-index: 0;
+        line-height: 1;
+
+        width: 40px;
+        height: 40px;
+
+        /* Because of polymer/2558, this style has lower specificity than * */
+        box-sizing: border-box !important;
+
+        @apply(--paper-icon-button);
+      }
+
+      :host #ink {
+        color: var(--paper-icon-button-ink-color, --primary-text-color);
+        opacity: 0.6;
+      }
+
+      :host([disabled]) {
+        color: var(--paper-icon-button-disabled-text, --disabled-text-color);
+        pointer-events: none;
+        cursor: auto;
+
+        @apply(--paper-icon-button-disabled);
+      }
+
+      :host(:hover) {
+        @apply(--paper-icon-button-hover);
+      }
+
+      iron-icon {
+        --iron-icon-width: 100%;
+        --iron-icon-height: 100%;
+      }
+    </style>
+
+    <iron-icon id="icon" src="[[src]]" icon="[[icon]]" alt$="[[alt]]"></iron-icon>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-icon-button',
+
+      hostAttributes: {
+        role: 'button',
+        tabindex: '0'
+      },
+
+      behaviors: [
+        Polymer.PaperInkyFocusBehavior
+      ],
+
+      properties: {
+        /**
+         * The URL of an image for the icon. If the src property is specified,
+         * the icon property should not be.
+         */
+        src: {
+          type: String
+        },
+
+        /**
+         * Specifies the icon name or index in the set of icons available in
+         * the icon's icon set. If the icon property is specified,
+         * the src property should not be.
+         */
+        icon: {
+          type: String
+        },
+
+        /**
+         * Specifies the alternate text for the button, for accessibility.
+         */
+        alt: {
+          type: String,
+          observer: "_altChanged"
+        }
+      },
+
+      _altChanged: function(newValue, oldValue) {
+        var label = this.getAttribute('aria-label');
+
+        // Don't stomp over a user-set aria-label.
+        if (!label || oldValue == label) {
+          this.setAttribute('aria-label', newValue);
+        }
+      }
+    });
+  </script>
+</dom-module>
+
+
+<script>
+  'use strict';
+
+  Polymer({
+    is: 'carbon-route',
+
+    properties: {
+      /**
+       * The URL component managed by this element.
+       */
+      route: {
+        type: Object,
+        notify: true
+      },
+
+      /**
+       * The pattern of slash-separated segments to match `path` against.
+       * 
+       * For example the pattern "/foo" will match "/foo" or "/foo/bar" 
+       * but not "/foobar".
+       *
+       * Path segments like `/:named` are mapped to properties on the `data` object.
+       */
+      pattern: {
+        type: String
+      },
+
+      /**
+       * The parameterized values that are extracted from the route as
+       * described by `pattern`.
+       */
+      data: {
+        type: Object,
+        value: function() {return {};},
+        notify: true
+      },
+
+      queryParams: {
+        type: Object,
+        value: function() {
+          return {};
+        },
+        notify: true
+      },
+
+      /**
+       * The part of `path` NOT consumed by `pattern`.
+       */
+      tail: {
+        type: Object,
+        value: function() {return {path: null, prefix: null, __queryParams: null};},
+        notify: true
+      },
+
+      active: {
+        type: Boolean,
+        notify: true,
+        readOnly: true
+      },
+
+      _skipMatch: {
+        value: false
+      },
+      _matched: {
+        value: ''
+      }
+    },
+
+    observers: [
+      '__tryToMatch(route.path, pattern)',
+      '__updatePathOnDataChange(data.*)',
+      '__tailPathChanged(tail.path)',
+      '__routeQueryParamsChanged(route.__queryParams)',
+      '__tailQueryParamsChanged(tail.__queryParams)',
+      '__queryParamsChanged(queryParams.*)'
+    ],
+
+    created: function() {
+      this.linkPaths('route.__queryParams', 'tail.__queryParams');
+      this.linkPaths('tail.__queryParams', 'route.__queryParams');
+    },
+
+    // Deal with the query params object being assigned to wholesale
+    __routeQueryParamsChanged: function(queryParams) {
+      if (queryParams && this.tail) {
+        this.set('tail.__queryParams', queryParams);
+
+        if (!this.active || this._skipMatch) {
+          return;
+        }
+
+        this._skipMatch = true;
+        this.set('queryParams', Object.assign({}, queryParams));
+        this._skipMatch = false;
+      }
+    },
+
+    __tailQueryParamsChanged: function(queryParams) {
+      if (queryParams && this.route) {
+        this.set('route.__queryParams', queryParams);
+      }
+    },
+
+    __queryParamsChanged: function(changes) {
+      if (!this.active || this._skipMatch) {
+        return;
+      }
+
+      this.set('route.__' + changes.path, changes.value);
+    },
+
+    __resetProperties: function() {
+      this._setActive(false);
+      this._matched = null;
+      //this.tail = { path: null, prefix: null, queryParams: null };
+      //this.data = {};
+    },
+
+    __tryToMatch: function(path, pattern) {
+      if (this._skipMatch || !pattern) {
+        return;
+      }
+
+      if (!path) {
+        this.__resetProperties();
+        return;
+      }
+
+      var remainingPieces = path.split('/');
+      var patternPieces = pattern.split('/');
+
+      var matched = [];
+      var namedMatches = {};
+
+      for (var i=0; i < patternPieces.length; i++) {
+        var patternPiece = patternPieces[i];
+        if (!patternPiece && patternPiece !== '') {
+          break;
+        }
+        var pathPiece = remainingPieces.shift();
+
+        // We don't match this path.
+        if (!pathPiece && pathPiece !== '') {
+          this.__resetProperties();
+          return;
+        }
+        matched.push(pathPiece);
+
+        if (patternPiece.charAt(0) == ':') {
+          namedMatches[patternPiece.slice(1)] = pathPiece;
+        } else if (patternPiece !== pathPiece) {
+          this.__resetProperties();
+          return;
+        }
+      }
+
+      var matched = matched.join('/');
+      var tailPath = remainingPieces.join('/');
+      if (remainingPieces.length > 0) {
+        tailPath = '/' + tailPath;
+      }
+
+      this._skipMatch = true;
+      this._matched = matched;
+      this.data = namedMatches;
+      var tailPrefix = this.route.prefix + matched;
+
+      if (!this.tail || this.tail.prefix !== tailPrefix || this.tail.path !== tailPath) {
+        this.tail = {
+          prefix: tailPrefix,
+          path: tailPath,
+          __queryParams: this.route.__queryParams
+        };
+      }
+      this._setActive(true);
+      this._skipMatch = false;
+    },
+
+    __tailPathChanged: function(path) {
+      if (!this.active || this._skipMatch) {
+        return;
+      }
+      var newPath = this._matched;
+      if (path) {
+        if (path.charAt(0) !== '/') {
+          path = '/' + path;
+        }
+        newPath += path;
+      }
+      this.set('route.path', newPath);
+    },
+
+    __updatePathOnDataChange: function() {
+      if (!this.route || this._skipMatch || !this.active) {
+        return;
+      }
+      this._skipMatch = true;
+      this.tail = {path: null, prefix: null, queryParams: null};
+      this.set('route.path', this.__getLink({}));
+      this._skipMatch = false;
+    },
+
+    __getLink: function(overrideValues) {
+      var values = {tail: this.tail};
+      for (var key in this.data) {
+        values[key] = this.data[key];
+      }
+      for (var key in overrideValues) {
+        values[key] = overrideValues[key];
+      }
+      var patternPieces = this.pattern.split('/');
+      var interp = patternPieces.map(function(value) {
+        if (value[0] == ':') {
+          value = values[value.slice(1)];
+        }
+        return value;
+      }, this);
+      if (values.tail && values.tail.path) {
+        interp.push(values.tail.path);
+      }
+      return interp.join('/');
+    }
+  });
+</script>
+
+<script>
+  'use strict';
+
+  Polymer({
+    is: 'iron-location',
+    properties: {
+      /**
+       * The pathname component of the URL.
+       */
+      path: {
+        type: String,
+        notify: true,
+        value: function() {
+          return window.location.pathname;
+        }
+      },
+      /**
+       * The query string portion of the URL.
+       */
+      query: {
+        type: String,
+        notify: true,
+        value: function() {
+          return window.location.search.slice(1);
+        }
+      },
+      /**
+       * The hash component of the URL.
+       */
+      hash: {
+        type: String,
+        notify: true,
+        value: function() {
+          return window.location.hash.slice(1);
+        }
+      },
+      /**
+       * If the user was on a URL for less than `dwellTime` milliseconds, it
+       * won't be added to the browser's history, but instead will be replaced
+       * by the next entry.
+       *
+       * This is to prevent large numbers of entries from clogging up the user's
+       * browser history. Disable by setting to a negative number.
+       */
+      dwellTime: {
+        type: Number,
+        value: 2000
+      },
+
+      /**
+       * A regexp that defines the set of URLs that should be considered part
+       * of this web app.
+       *
+       * Clicking on a link that matches this regex won't result in a full page
+       * navigation, but will instead just update the URL state in place.
+       *
+       * This regexp is given everything after the origin in an absolute
+       * URL. So to match just URLs that start with /search/ do:
+       *     url-space-regex="^/search/"
+       *
+       * @type {string|RegExp}
+       */
+      urlSpaceRegex: {
+        type: String,
+        value: ''
+      },
+
+      /**
+       * urlSpaceRegex, but coerced into a regexp.
+       *
+       * @type {RegExp}
+       */
+      _urlSpaceRegExp: {
+        computed: '_makeRegExp(urlSpaceRegex)'
+      },
+
+      _lastChangedAtAt: {
+        type: Number,
+        value: -Infinity
+      },
+
+      _initialized: {
+        type: Boolean,
+        value: false
+      }
+    },
+    hostAttributes: {
+      hidden: true
+    },
+    observers: [
+      '_updateUrl(path, query, hash)'
+    ],
+    attached: function() {
+      this.listen(window, 'hashchange', '_hashChanged');
+      this.listen(window, 'location-changed', '_urlChanged');
+      this.listen(window, 'popstate', '_urlChanged');
+      this.listen(/** @type {!HTMLBodyElement} */(document.body), 'click', '_globalOnClick');
+
+      this._urlChanged();
+      this._initialized = true;
+    },
+    detached: function() {
+      this.unlisten(window, 'hashchange', '_hashChanged');
+      this.unlisten(window, 'location-changed', '_urlChanged');
+      this.unlisten(window, 'popstate', '_urlChanged');
+      this.unlisten(/** @type {!HTMLBodyElement} */(document.body), 'click', '_globalOnClick');
+      this._initialized = false;
+    },
+    /**
+     * @return {number} the number of milliseconds since some point in the
+     *     past. Only useful for comparing against other results from this
+     *     function.
+     */
+    _now: function() {
+      if (window.performance && window.performance.now) {
+        return window.performance.now();
+      }
+      return new Date().getTime();
+    },
+    _hashChanged: function() {
+      this.hash = window.location.hash.substring(1);
+    },
+    _urlChanged: function() {
+      // We want to extract all info out of the updated URL before we
+      // try to write anything back into it.
+      //
+      // i.e. without _dontUpdateUrl we'd overwrite the new path with the old
+      // one when we set this.hash. Likewise for query.
+      this._dontUpdateUrl = true;
+      this._hashChanged();
+      this.path = window.location.pathname;
+      this.query = window.location.search.substring(1);
+      this._dontUpdateUrl = false;
+      this._updateUrl();
+    },
+    _getUrl: function() {
+      var url = this.path;
+      var query = this.query;
+      if (query) {
+        url += '?' + query;
+      }
+      if (this.hash) {
+        url += '#' + this.hash;
+      }
+      return url;
+    },
+    _updateUrl: function() {
+      if (this._dontUpdateUrl || !this._initialized) {
+        return;
+      }
+      var newUrl = this._getUrl();
+      var currentUrl = (
+          window.location.pathname +
+          window.location.search +
+          window.location.hash
+      );
+      if (newUrl == currentUrl) {
+        // nothing to do, the URL didn't change
+        return;
+      }
+      var now = this._now();
+      var shouldReplace =
+          this._lastChangedAt + this.dwellTime > now;
+      this._lastChangedAt = now;
+      if (shouldReplace) {
+        window.history.replaceState({}, '', newUrl);
+      } else {
+        window.history.pushState({}, '', newUrl);
+      }
+      this.fire('location-changed', {}, {node: window});
+    },
+    /**
+     * A necessary evil so that links work as expected. Does its best to
+     * bail out early if possible.
+     *
+     * @param {MouseEvent} event .
+     */
+    _globalOnClick: function(event) {
+      var href = this._getSameOriginLinkHref(event);
+      if (!href) {
+        return;
+      }
+
+      window.history.pushState({}, '', href);
+      this.fire('location-changed', {}, {node: window});
+      event.preventDefault();
+    },
+    /**
+     * Returns the absolute URL of the link (if any) that this click event
+     * is clicking on, if we can and should override the resulting full
+     * page navigation. Returns null otherwise.
+     *
+     * This method is separated away from _globalOnClick for testability,
+     * as we can't test that a clicked link should have resulted in navigating
+     * away from the test page.
+     *
+     * @param {MouseEvent} event .
+     * @return {string?} .
+     */
+    _getSameOriginLinkHref: function(event) {
+      // We only care about left-clicks.
+      if (event.button !== 0) {
+        return null;
+      }
+      // We don't want modified clicks, where the intent is to open the page
+      // in a new tab.
+      if (event.metaKey || event.ctrlKey) {
+        return null;
+      }
+      var eventPath = Polymer.dom(event).path;
+      var href = null;
+      for (var i = 0; i < eventPath.length; i++) {
+        var element = eventPath[i];
+        if (element.tagName === 'A' && element.href) {
+          href = element.href;
+          break;
+        }
+      }
+      // If there's no link there's nothing to do.
+      if (!href) {
+        return null;
+      }
+
+      // It only makes sense for us to intercept same-origin navigations.
+      // pushState/replaceState don't work with cross-origin links.
+      var url;
+      if (document.baseURI != null) {
+        url = new URL(href, /** @type {string} */(document.baseURI));
+      } else {
+        url = new URL(href);
+      }
+
+      if (url.origin !== window.location.origin) {
+        return null;
+      }
+      var normalizedHref = url.pathname + url.search + url.hash;
+
+      // If we've been configured not to handle this url... don't handle it!
+      if (this._urlSpaceRegExp &&
+          !this._urlSpaceRegExp.test(normalizedHref)) {
+        return null;
+      }
+
+      return normalizedHref;
+    },
+    _makeRegExp: function(urlSpaceRegex) {
+      return RegExp(urlSpaceRegex);
+    }
+  });
+</script>
+<script>
+  'use strict';
+
+  Polymer({
+    is: 'iron-query-params',
+    properties: {
+      paramsString: {
+        type: String,
+        notify: true,
+        observer: 'paramsStringChanged',
+      },
+      paramsObject: {
+        type: Object,
+        notify: true,
+        value: function() {
+          return {};
+        }
+      },
+      _dontReact: {
+        type: Boolean,
+        value: false
+      }
+    },
+    hostAttributes: {
+      hidden: true
+    },
+    observers: [
+      'paramsObjectChanged(paramsObject.*)'
+    ],
+    paramsStringChanged: function() {
+      this._dontReact = true;
+      this.paramsObject = this._decodeParams(this.paramsString);
+      this._dontReact = false;
+    },
+    paramsObjectChanged: function() {
+      if (this._dontReact) {
+        return;
+      }
+      this.paramsString = this._encodeParams(this.paramsObject);
+    },
+    _encodeParams: function(params) {
+      var encodedParams = [];
+      for (var key in params) {
+        var value = params[key];
+        if (value === '') {
+          encodedParams.push(encodeURIComponent(key));
+        } else if (value) {
+          encodedParams.push(
+              encodeURIComponent(key) +
+              '=' +
+              encodeURIComponent(value.toString())
+          );
+        }
+      }
+      return encodedParams.join('&');
+    },
+    _decodeParams: function(paramString) {
+      var params = {};
+      var paramList = (paramString || '').split('&');
+      for (var i = 0; i < paramList.length; i++) {
+        var param = paramList[i].split('=');
+        if (param[0]) {
+          params[decodeURIComponent(param[0])] =
+              decodeURIComponent(param[1] || '');
+        }
+      }
+      return params;
+    }
+  });
+</script>
+
+
+<script>
+  'use strict';
+
+  Polymer({
+    is: 'carbon-route-converter',
+
+    properties: {
+      /**
+       * A model representing the deserialized path through the route tree, as
+       * well as the current queryParams.
+       *
+       * A route object is the kernel of the routing system. It is intended to
+       * be fed into consuming elements such as `carbon-route`.
+       */
+      route: {
+        type: Object,
+        value: null,
+        notify: true
+      },
+
+      /**
+       * A set of key/value pairs that are universally accessible to branches of
+       * the route tree.
+       */
+      queryParams: {
+        type: Object,
+        value: null,
+        notify: true
+      },
+
+      /**
+       * The serialized path through the route tree. This corresponds to the
+       * `window.location.pathname` value, and will update to reflect changes
+       * to that value.
+       */
+      path: {
+        type: String,
+        notify: true,
+        value: ''
+      }
+    },
+
+    observers: [
+      '_locationChanged(path, queryParams)',
+      '_routeChanged(route.prefix, route.path)',
+      '_routeQueryParamsChanged(route.__queryParams)'
+    ],
+
+    created: function() {
+      this.linkPaths('route.__queryParams', 'queryParams');
+      this.linkPaths('queryParams', 'route.__queryParams');
+    },
+
+    /**
+     * Handler called when the path or queryParams change.
+     *
+     * @param  {!string} path The serialized path through the route tree.
+     * @param  {Object} queryParams A set of key/value pairs that are
+     * universally accessible to branches of the route tree.
+     */
+    _locationChanged: function(path, queryParams) {
+      this.route = {
+        prefix: '',
+        path: path,
+        __queryParams: queryParams
+      };
+    },
+
+    /**
+     * Handler called when the route prefix and route path change.
+     *
+     * @param  {!string} prefix The fragment of the pathname that precedes the
+     * path.
+     * @param  {!string} path The serialized path through the route tree.
+     */
+    _routeChanged: function(prefix, path) {
+      if (!this.route) {
+        return;
+      }
+
+      this.path = prefix + path;
+    },
+
+    /**
+     * Handler called when the route queryParams change.
+     *
+     * @param  {Object} queryParams A set of key/value pairs that are
+     * universally accessible to branches of the route tree.
+     */
+    _routeQueryParamsChanged: function(queryParams) {
+      if (!this.route) {
+        return;
+      }
+      this.queryParams = queryParams;
+    }
+  });
+</script>
+
+
+<dom-module id="carbon-location" assetpath="../../bower_components/carbon-route/">
+  <template>
+    <iron-location path="{{__path}}" query="{{__query}}" hash="{{__hash}}" url-space-regex="{{urlSpaceRegex}}">
+    </iron-location>
+    <iron-query-params params-string="{{__query}}" params-object="{{__queryParams}}">
+    </iron-query-params>
+    <carbon-route-converter on-path-changed="__onPathChanged" path="[[__computeRoutePath(__path, __hash, useHashAsPath)]]" query-params="{{__queryParams}}" route="{{route}}">
+    </carbon-route-converter>
+  </template>
+  <script>
+    'use strict';
+
+    Polymer({
+      is: 'carbon-location',
+
+      properties: {
+        /**
+         * A model representing the deserialized path through the route tree, as
+         * well as the current queryParams.
+         */
+        route: {
+          type: Object,
+          notify: true
+        },
+
+        /**
+         * In many scenarios, it is convenient to treat the `hash` as a stand-in
+         * alternative to the `path`. For example, if deploying an app to a static
+         * web server (e.g., Github Pages) - where one does not have control over
+         * server-side routing - it is usually a better experience to use the hash
+         * to represent paths through one's app.
+         *
+         * When this property is set to true, the `hash` will be used in place of
+
+         * the `path` for generating a `route`.
+         */
+        useHashAsPath: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * A regexp that defines the set of URLs that should be considered part
+         * of this web app.
+         *
+         * Clicking on a link that matches this regex won't result in a full page
+         * navigation, but will instead just update the URL state in place.
+         *
+         * This regexp is given everything after the origin in an absolute
+         * URL. So to match just URLs that start with /search/ do:
+         *     url-space-regex="^/search/"
+         *
+         * @type {string|RegExp}
+         */
+        urlSpaceRegex: {
+          type: String,
+          notify: true
+        },
+
+        /**
+         * A set of key/value pairs that are universally accessible to branches
+         * of the route tree.
+         */
+        __queryParams: {
+          type: Object
+        },
+
+        /**
+         * The pathname component of the current URL.
+         */
+        __path: {
+          type: String
+        },
+
+        /**
+         * The query string portion of the current URL.
+         */
+        __query: {
+          type: String
+        },
+
+        /**
+         * The hash portion of the current URL.
+         */
+        __hash: {
+          type: String
+        }
+      },
+
+      __computeRoutePath: function(path, hash, useHashAsPath) {
+        return useHashAsPath ? hash : path;
+      },
+
+      __onPathChanged: function(event) {
+        var path = event.detail.value;
+
+        if (this.useHashAsPath) {
+          this.__hash = path;
+        } else {
+          this.__path = path;
+        }
+      }
+    });
+  </script>
+</dom-module>
+<script>
+  Polymer.AppLayout = Polymer.AppLayout || {};
+
+  Polymer.AppLayout.scrollEffects = Polymer.AppLayout.scrollEffects || {};
+
+  Polymer.AppLayout.scrollTimingFunction = function easeOutQuad(t, b, c, d) {
+    t /= d;
+    return -c * t*(t-2) + b;
+  };
+
+  /**
+   * Helper function that scrolls to a particular set of coordinates in a scroll target.
+   * If the scroll target is not defined, then it would use the main document as the target.
+   *
+   * To scroll in a smooth fashion, you can set the option `behavior: 'smooth'`. e.g.
+   *
+   * ```js
+   * Polymer.AppLayout.scroll({top: 0, behavior: 'smooth'});
+   * ```
+   *
+   * To scroll in a silent mode, without notifying scroll changes to any app-layout elements,
+   * you can set the option `behavior: 'silent'`. This is particularly useful we you are using
+   * `app-header` and you desire to scroll to the top of a scrolling region without running
+   * scroll effects. e.g.
+   *
+   * ```js
+   * Polymer.AppLayout.scroll({top: 0, behavior: 'silent'});
+   * ```
+   *
+   * @param {Object} options {top: Number, left: Number, behavior: String(smooth | silent)}
+   */
+  Polymer.AppLayout.scroll = function scroll(options) {
+    options = options || {};
+
+    var docEl = document.documentElement;
+    var target = options.target || docEl;
+    var hasNativeScrollBehavior = 'scrollBehavior' in target.style && target.scroll;
+    var scrollClassName = 'app-layout-silent-scroll';
+    var scrollTop = options.top || 0;
+    var scrollLeft = options.left || 0;
+    var scrollTo = target === docEl ? window.scrollTo :
+      function scrollTo(scrollLeft, scrollTop) {
+        target.scrollLeft = scrollLeft;
+        target.scrollTop = scrollTop;
+      };
+
+    if (options.behavior === 'smooth') {
+
+      if (hasNativeScrollBehavior) {
+
+        target.scroll(options);
+
+      } else {
+
+        var timingFn = Polymer.AppLayout.scrollTimingFunction;
+        var startTime = Date.now();
+        var currentScrollTop = target === docEl ? window.pageYOffset : target.scrollTop;
+        var currentScrollLeft = target === docEl ? window.pageXOffset : target.scrollLeft;
+        var deltaScrollTop = scrollTop - currentScrollTop;
+        var deltaScrollLeft = scrollLeft - currentScrollLeft;
+        var duration = 300;
+
+        (function updateFrame() {
+          var now = Date.now();
+          var elapsedTime = now - startTime;
+
+          if (elapsedTime < duration) {
+            scrollTo(
+                timingFn(elapsedTime, currentScrollLeft, deltaScrollLeft, duration),
+                timingFn(elapsedTime, currentScrollTop, deltaScrollTop, duration)
+              );
+            requestAnimationFrame(updateFrame.bind(this));
+          }
+        }).call(this);
+      }
+
+    } else if (options.behavior === 'silent') {
+
+      docEl.classList.add(scrollClassName);
+
+      // Browsers keep the scroll momentum even if the bottom of the scrolling content
+      // was reached. This means that calling scroll({top: 0, behavior: 'silent'}) when
+      // the momentum is still going will result in more scroll events and thus scroll effects.
+      // This seems to only apply when using document scrolling.
+      // Therefore, when should we remove the class from the document element?
+
+      clearInterval(Polymer.AppLayout._scrollTimer);
+
+      Polymer.AppLayout._scrollTimer = setTimeout(function() {
+        docEl.classList.remove(scrollClassName);
+        Polymer.AppLayout._scrollTimer = null;
+      }, 100);
+
+      scrollTo(scrollLeft, scrollTop);
+
+    } else {
+
+      scrollTo(scrollLeft, scrollTop);
+
+    }
+  };
+
+</script>
+
+
+<dom-module id="app-drawer" assetpath="../../bower_components/app-layout/app-drawer/">
+
+  <style>
+
+    :host {
+      position: fixed;
+      top: -120px;
+      bottom: -120px;
+      left: 0;
+      right: 0;
+      visibility: hidden;
+      transition: visibility 0.2s ease;
+    }
+
+    :host([opened]) {
+      visibility: visible;
+    }
+
+    :host([persistent]) {
+      width: var(--app-drawer-width, 256px);
+    }
+
+    :host([persistent][position=left]) {
+      right: auto;
+    }
+
+    :host([persistent][position=right]) {
+      left: auto;
+    }
+
+    #contentContainer {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: var(--app-drawer-width, 256px);
+      background-color: #FFF;
+      padding: 120px 0;
+
+      transition: 0.2s ease;
+      transition-property: -webkit-transform;
+      transition-property: transform;
+
+      -webkit-transform: translate3d(-100%, 0, 0);
+      transform: translate3d(-100%, 0, 0);
+
+      @apply(--app-drawer-content-container);
+    }
+
+    #contentContainer:focus {
+      outline: none;
+    }
+
+    :host([position=right]) > #contentContainer {
+      left: auto;
+      right: 0;
+
+      -webkit-transform: translate3d(100%, 0, 0);
+      transform: translate3d(100%, 0, 0);
+    }
+
+    :host([swipe-open]) > #contentContainer::after {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 100%;
+      width: 15px;
+      content: '';
+      visibility: visible;
+    }
+
+    :host([swipe-open][position=right]) > #contentContainer::after {
+      left: auto;
+      right: 100%;
+    }
+
+    :host([opened]) > #contentContainer {
+      -webkit-transform: translate3d(0, 0, 0);
+      transform: translate3d(0, 0, 0);
+    }
+
+    #scrim {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--app-drawer-scrim-background, rgba(0, 0, 0, 0.5));
+      opacity: 0;
+      transition: opacity 0.2s ease;
+
+      -webkit-transform: translateZ(0);
+      transform:  translateZ(0);
+    }
+
+    :host([opened]) > #scrim {
+      opacity: 1;
+    }
+
+    :host([opened][persistent]) > #scrim {
+      /**
+       * NOTE(keanulee): Keep both opacity: 0 and visibility: hidden to prevent the
+       * scrim from showing when toggling between closed and opened/persistent.
+       */
+      opacity: 0;
+      visibility: hidden;
+    }
+
+  </style>
+
+  <template>
+
+    <div id="scrim" on-tap="close" on-transitionend="_scrimTransitionend"></div>
+
+    <div id="contentContainer" tabindex="0">
+      <content></content>
+    </div>
+
+  </template>
+
+  <script>
+
+    Polymer({
+
+      is: 'app-drawer',
+
+      properties: {
+
+        /**
+         * The opened state of the drawer.
+         */
+        opened: {
+          type: Boolean,
+          value: false,
+          notify: true,
+          reflectToAttribute: true
+        },
+
+        /**
+         * The drawer does not have a scrim and cannot be swiped close.
+         */
+        persistent: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        },
+
+        /**
+         * The alignment of the drawer on the screen ('start', 'end', 'left', or 'right').
+         * 'start' computes to left and 'end' to right in LTR layout and vice versa in RTL
+         * layout.
+         */
+        align: {
+          type: String,
+          value: 'start',
+        },
+
+        /**
+         * The computed, read-only position of the drawer on the screen ('left' or 'right').
+         */
+        position: {
+          type: String,
+          readOnly: true,
+          value: 'left',
+          reflectToAttribute: true
+        },
+
+        /**
+         * Create an area at the edge of the screen to swipe open the drawer.
+         */
+        swipeOpen: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        }
+
+      },
+
+      listeners: {
+        track: '_track'
+      },
+
+      observers: [
+        'resetLayout(position)',
+        '_resetFocusedContent(persistent)',
+        '_resetPosition(align, isAttached)'
+      ],
+
+      _translateOffset: 0,
+
+      _trackDetails: null,
+
+      _isDrawerFlinging: false,
+
+      _boundFocusHandler: null,
+
+      _boundKeydownHandler: null,
+
+      ready: function() {
+        // Set the scroll direction so you can vertically scroll inside the drawer.
+        this.setScrollDirection('y');
+
+        // Only transition the drawer shortly after it is attached (e.g. app-drawer-layout
+        // may need to set the initial opened state which should not be transitioned).
+        this._setTransitionDuration('0s');
+
+        this._boundFocusHandler = this._focusHandler.bind(this);
+        this._boundKeydownHandler = this._keydownHandler.bind(this);
+      },
+
+      attached: function() {
+        // Only transition the drawer shortly after it is attached (e.g. app-drawer-layout
+        // may need to set the initial opened state which should not be transitioned).
+        requestAnimationFrame(this._setTransitionDuration.bind(this, ''));
+      },
+
+      detached: function() {
+        document.removeEventListener('focus', this._boundFocusHandler, true /* useCapture */);
+        document.removeEventListener('keydown', this._boundKeydownHandler);
+      },
+
+      /**
+       * Opens the drawer.
+       */
+      open: function() {
+        this.opened = true;
+      },
+
+      /**
+       * Closes the drawer.
+       */
+      close: function() {
+        this.opened = false;
+      },
+
+      /**
+       * Toggles the drawer open and close.
+       */
+      toggle: function() {
+        this.opened = !this.opened;
+      },
+
+      /**
+       * Gets the width of the drawer.
+       *
+       * @return {number} The width of the drawer in pixels.
+       */
+      getWidth: function() {
+        return this.$.contentContainer.offsetWidth;
+      },
+
+      resetLayout: function() {
+        this.debounce('_resetLayout', function() {
+          this.fire('app-drawer-reset-layout');
+        }, 1);
+      },
+
+      _isRTL: function() {
+        return window.getComputedStyle(this).direction === 'rtl';
+      },
+
+      _resetPosition: function() {
+        switch (this.align) {
+          case 'start':
+            this._setPosition(this._isRTL() ? 'right' : 'left');
+            return;
+          case 'end':
+            this._setPosition(this._isRTL() ? 'left' : 'right');
+            return;
+        }
+        this._setPosition(this.align);
+      },
+
+      _focusHandler: function(event) {
+        if (Polymer.dom(event).path.indexOf(this.$.contentContainer) === -1) {
+          this.$.contentContainer.focus();
+        }
+      },
+
+      _keydownHandler: function(event) {
+        var ESC_KEYCODE = 27;
+        if (event.keyCode === ESC_KEYCODE) {
+          // Prevent any side effects if app-drawer closes.
+          event.preventDefault();
+          event.stopImmediatePropagation();
+
+          this.close();
+        }
+      },
+
+      _track: function(event) {
+        if (this.persistent) {
+          return;
+        }
+
+        // Disable user selection on desktop.
+        event.preventDefault();
+
+        switch (event.detail.state) {
+          case 'start':
+            this._trackStart(event);
+            break;
+          case 'track':
+            this._trackMove(event);
+            break;
+          case 'end':
+            this._trackEnd(event);
+            break;
+        }
+      },
+
+      _trackStart: function(event) {
+        // Disable transitions since style attributes will reflect user track events.
+        this._setTransitionDuration('0s');
+        this.style.visibility = 'visible';
+
+        var rect = this.$.contentContainer.getBoundingClientRect();
+        if (this.position === 'left') {
+          this._translateOffset = rect.left;
+        } else {
+          this._translateOffset = rect.right - window.innerWidth;
+        }
+
+        this._trackDetails = [];
+      },
+
+      _trackMove: function(event) {
+        this._translateDrawer(event.detail.dx + this._translateOffset);
+
+        // Use Date.now() since event.timeStamp is inconsistent across browsers (e.g. most
+        // browsers use milliseconds but FF 44 uses microseconds).
+        this._trackDetails.push({
+          dx: event.detail.dx,
+          timeStamp: Date.now()
+        });
+      },
+
+      _trackEnd: function(event) {
+        var x = event.detail.dx + this._translateOffset;
+        var drawerWidth = this.getWidth();
+        var isPositionLeft = this.position === 'left';
+        var isInEndState = isPositionLeft ? (x >= 0 || x <= -drawerWidth) :
+          (x <= 0 || x >= drawerWidth);
+
+        // No longer need the track events after this method returns - allow them to be GC'd.
+        var trackDetails = this._trackDetails;
+        this._trackDetails = null;
+
+        if (!isInEndState) {
+          this._flingDrawer(event, trackDetails);
+          if (this._isDrawerFlinging) {
+            return;
+          }
+        }
+
+        // If the drawer is not flinging, toggle the opened state based on the position of
+        // the drawer.
+        var halfWidth = drawerWidth / 2;
+        if (event.detail.dx < -halfWidth) {
+          this.opened = this.position === 'right';
+        } else if (event.detail.dx > halfWidth) {
+          this.opened = this.position === 'left';
+        }
+
+        // Reset focused content now since there will be no transitionend event.
+        if (isInEndState) {
+          this._resetFocusedContent();
+        }
+
+        this._setTransitionDuration('');
+        this._resetDrawerTranslate();
+        this.style.visibility = '';
+      },
+
+      _calculateVelocity: function(event, trackDetails) {
+        // Find the oldest track event that is within 100ms using binary search.
+        var now = Date.now();
+        var timeLowerBound = now - 100;
+        var trackDetail;
+        var min = 0;
+        var max = trackDetails.length - 1;
+
+        while (min <= max) {
+          // Floor of average of min and max.
+          var mid = (min + max) >> 1;
+          var d = trackDetails[mid];
+          if (d.timeStamp >= timeLowerBound) {
+            trackDetail = d;
+            max = mid - 1;
+          } else {
+            min = mid + 1;
+          }
+        }
+
+        if (trackDetail) {
+          var dx = event.detail.dx - trackDetail.dx;
+          var dt = (now - trackDetail.timeStamp) || 1;
+          return dx / dt;
+        }
+        return 0;
+      },
+
+      _flingDrawer: function(event, trackDetails) {
+        var velocity = this._calculateVelocity(event, trackDetails);
+
+        // Do not fling if velocity is not above a threshold.
+        if (Math.abs(velocity) < this.MIN_FLING_VELOCITY) {
+          return;
+        }
+
+        var x = event.detail.dx + this._translateOffset;
+        var drawerWidth = this.getWidth();
+        var isPositionLeft = this.position === 'left';
+        var isVelocityPositive = velocity > 0;
+        var isClosingLeft = !isVelocityPositive && isPositionLeft;
+        var isClosingRight = isVelocityPositive && !isPositionLeft;
+        var dx;
+        if (isClosingLeft) {
+          dx = -(x + drawerWidth);
+        } else if (isClosingRight) {
+          dx = (drawerWidth - x);
+        } else {
+          dx = -x;
+        }
+
+        // Enforce a minimum transition velocity to make the drawer feel snappy.
+        if (isVelocityPositive) {
+          velocity = Math.max(velocity, this.MIN_TRANSITION_VELOCITY);
+          this.opened = this.position === 'left';
+        } else {
+          velocity = Math.min(velocity, -this.MIN_TRANSITION_VELOCITY);
+          this.opened = this.position === 'right';
+        }
+
+        // Calculate the amount of time needed to finish the transition based on the
+        // initial slope of the timing function.
+        this._setTransitionDuration((this.FLING_INITIAL_SLOPE * dx / velocity) + 'ms');
+        this._setTransitionTimingFunction(this.FLING_TIMING_FUNCTION);
+
+        this._resetDrawerTranslate();
+
+        this._isDrawerFlinging = true;
+      },
+
+      _scrimTransitionend: function(event) {
+        // Focused content should only be reset once - we choose to rely on the scrim
+        // because contentContainer would fire transitionend between translateX(256px)
+        // and translateX(100%), which we don't want since those are the same state.
+
+        // If the drawer was flinging, we need to reset the style attributes.
+        if (this._isDrawerFlinging) {
+          this._isDrawerFlinging = false;
+          this._setTransitionDuration('');
+          this._setTransitionTimingFunction('');
+          this.style.visibility = '';
+        }
+
+        this._resetFocusedContent();
+      },
+
+      _setTransitionDuration: function(duration) {
+        this.$.contentContainer.style.transitionDuration = duration;
+        this.$.scrim.style.transitionDuration = duration;
+      },
+
+      _setTransitionTimingFunction: function(timingFunction) {
+        this.$.contentContainer.style.transitionTimingFunction = timingFunction;
+        this.$.scrim.style.transitionTimingFunction = timingFunction;
+      },
+
+      _translateDrawer: function(x) {
+        var drawerWidth = this.getWidth();
+
+        if (this.position === 'left') {
+          x = Math.max(-drawerWidth, Math.min(x, 0));
+          this.$.scrim.style.opacity = 1 + x / drawerWidth;
+        } else {
+          x = Math.max(0, Math.min(x, drawerWidth));
+          this.$.scrim.style.opacity = 1 - x / drawerWidth;
+        }
+
+        this.translate3d(x + 'px', '0', '0', this.$.contentContainer);
+      },
+
+      _resetDrawerTranslate: function() {
+        this.$.scrim.style.opacity = '';
+        this.transform('', this.$.contentContainer);
+      },
+
+      _resetFocusedContent: function() {
+        if (this.opened && !this.persistent) {
+          this.$.contentContainer.focus();
+          document.addEventListener('focus', this._boundFocusHandler, true /* useCapture */);
+          document.addEventListener('keydown', this._boundKeydownHandler);
+          document.body.style.overflow = 'hidden';
+        } else {
+          document.removeEventListener('focus', this._boundFocusHandler, true /* useCapture */);
+          document.removeEventListener('keydown', this._boundKeydownHandler);
+          document.body.style.overflow = '';
+        }
+      },
+
+      MIN_FLING_VELOCITY: 0.2,
+
+      MIN_TRANSITION_VELOCITY: 1.2,
+
+      FLING_TIMING_FUNCTION: 'cubic-bezier(0.667, 1, 0.667, 1)',
+
+      FLING_INITIAL_SLOPE: 1.5
+
+      /**
+       * Fired when the layout of app-drawer has changed.
+       *
+       * @event app-drawer-reset-layout
+       */
+
+    });
+
+  </script>
+
+</dom-module>
+
+
+<dom-module id="app-drawer-layout" assetpath="../../bower_components/app-layout/app-drawer-layout/">
+
+  <style>
+
+    :host {
+      display: block;
+    }
+
+    :host([fullbleed]) {
+      @apply(--layout-fit);
+    }
+
+    #contentContainer {
+      position: relative;
+      height: 100%;
+      transition: var(--app-drawer-layout-content-transition, none);
+    }
+
+    #contentContainer:not(.narrow) > ::content [drawer-toggle] {
+      display: none;
+    }
+
+  </style>
+
+  <template>
+
+    <div id="contentContainer" class$="[[_computeClass(narrow)]]">
+      <content select=":not(app-drawer)"></content>
+    </div>
+
+    <content id="drawerContent" select="app-drawer"></content>
+
+    <iron-media-query query="[[_computeMediaQuery(forceNarrow, responsiveWidth)]]" on-query-matches-changed="_onQueryMatchesChanged"></iron-media-query>
+
+  </template>
+
+  <script>
+
+    Polymer({
+
+      is: 'app-drawer-layout',
+
+      properties: {
+
+        /**
+         * Returns true if the panel is in narrow layout. This is useful if you
+         * need to show/hide elements based on the layout.
+         */
+        narrow: {
+          type: Boolean,
+          readOnly: true,
+          notify: true,
+          reflectToAttribute: true,
+          value: false
+        },
+
+        /**
+         * If true, ignore `responsiveWidth` setting and force the narrow layout.
+         */
+        forceNarrow: {
+          type: Boolean,
+          value: false,
+          observer: '_responsiveChange'
+        },
+
+        /**
+         * If the viewport's width is smaller than this value, the panel will change to narrow layout.
+         * In the mode the drawer will be closed.
+         */
+        responsiveWidth: {
+          type: String,
+          value: '640px'
+        }
+
+      },
+
+      listeners: {
+        'tap': '_tapHandler',
+        'app-drawer-reset-layout': 'resetLayout'
+      },
+
+      attached: function() {
+        this.resetLayout();
+      },
+
+      /**
+       * Gets the drawer element.
+       *
+       * @property drawer
+       */
+      get drawer() {
+        return Polymer.dom(this.$.drawerContent).getDistributedNodes()[0];
+      },
+
+      _tapHandler: function(e) {
+        var target = Polymer.dom(e).localTarget;
+        if (target && target.hasAttribute('drawer-toggle')) {
+          this.drawer.toggle();
+        }
+      },
+
+      _responsiveChange: function(narrow) {
+        this._setNarrow(narrow);
+        this.resetLayout();
+      },
+
+      resetLayout: function() {
+        this.debounce('_resetLayout', function() {
+          if (!this.isAttached) {
+            return;
+          }
+          this.drawer.opened = !this.narrow;
+          this.drawer.persistent = !this.narrow;
+          if (this.narrow) {
+            this.$.contentContainer.style.marginLeft = '';
+            this.$.contentContainer.style.marginRight = '';
+          } else if (this.drawer.position == 'right') {
+            this.$.contentContainer.style.marginLeft = '';
+            this.$.contentContainer.style.marginRight = this.drawer.getWidth() + 'px';
+          } else {
+            this.$.contentContainer.style.marginLeft = this.drawer.getWidth() + 'px';
+            this.$.contentContainer.style.marginRight = '';
+          }
+        });
+      },
+
+      _onQueryMatchesChanged: function(event) {
+        this._responsiveChange(event.detail.value);
+      },
+
+      _computeMediaQuery: function(forceNarrow, responsiveWidth) {
+        return forceNarrow ? '' : '(max-width: ' + responsiveWidth + ')';
+      },
+
+      /**
+       * NOTE(keanulee): IE/Edge does not properly update element styles when using
+       * dynamically inserted style tags that match with :not([attribute]) rules,
+       * so we use a :not(.class) rule instead. Ref
+       * https://connect.microsoft.com/IE/feedbackdetail/view/2217046/element-styles-not-updated-when-using-dynamically-inserted-style-tags-that-match-with-not-attribute-rules
+       */
+      _computeClass: function(narrow) {
+        return narrow ? 'narrow' : '';
+      }
+
+    });
+
+  </script>
+
+</dom-module>
+<script>
+
+  /**
+   * `Polymer.IronScrollTargetBehavior` allows an element to respond to scroll events from a
+   * designated scroll target.
+   *
+   * Elements that consume this behavior can override the `_scrollHandler`
+   * method to add logic on the scroll event.
+   *
+   * @demo demo/scrolling-region.html Scrolling Region
+   * @demo demo/document.html Document Element
+   * @polymerBehavior
+   */
+  Polymer.IronScrollTargetBehavior = {
+
+    properties: {
+
+      /**
+       * Specifies the element that will handle the scroll event
+       * on the behalf of the current element. This is typically a reference to an element,
+       * but there are a few more posibilities:
+       *
+       * ### Elements id
+       *
+       *```html
+       * <div id="scrollable-element" style="overflow: auto;">
+       *  <x-element scroll-target="scrollable-element">
+       *    <!-- Content-->
+       *  </x-element>
+       * </div>
+       *```
+       * In this case, the `scrollTarget` will point to the outer div element. 
+       *
+       * ### Document scrolling
+       *
+       * For document scrolling, you can use the reserved word `document`:
+       *
+       *```html
+       * <x-element scroll-target="document">
+       *   <!-- Content -->
+       * </x-element>
+       *```
+       *
+       * ### Elements reference
+       *
+       *```js
+       * appHeader.scrollTarget = document.querySelector('#scrollable-element');
+       *```
+       * 
+       * @type {HTMLElement}
+       */
+      scrollTarget: {
+        type: HTMLElement,
+        value: function() {
+          return this._defaultScrollTarget;
+        }
+      }
+    },
+
+    observers: [
+      '_scrollTargetChanged(scrollTarget, isAttached)'
+    ],
+
+    _scrollTargetChanged: function(scrollTarget, isAttached) {
+      var eventTarget;
+
+      if (this._oldScrollTarget) {
+        eventTarget = this._oldScrollTarget === this._doc ? window : this._oldScrollTarget;
+        eventTarget.removeEventListener('scroll', this._boundScrollHandler);
+        this._oldScrollTarget = null;
+      }
+
+      if (!isAttached) {
+        return;
+      }
+      // Support element id references
+      if (scrollTarget === 'document') {
+
+        this.scrollTarget = this._doc;
+
+      } else if (typeof scrollTarget === 'string') {
+
+        this.scrollTarget = this.domHost ? this.domHost.$[scrollTarget] :
+            Polymer.dom(this.ownerDocument).querySelector('#' + scrollTarget);
+
+      } else if (this._isValidScrollTarget()) {
+
+        eventTarget = scrollTarget === this._doc ? window : scrollTarget;
+        this._boundScrollHandler = this._boundScrollHandler || this._scrollHandler.bind(this);
+        this._oldScrollTarget = scrollTarget;
+
+        eventTarget.addEventListener('scroll', this._boundScrollHandler);
+      }
+    },
+
+    /**
+     * Runs on every scroll event. Consumer of this behavior may override this method.
+     *
+     * @protected
+     */
+    _scrollHandler: function scrollHandler() {},
+
+    /**
+     * The default scroll target. Consumers of this behavior may want to customize
+     * the default scroll target.
+     *
+     * @type {Element}
+     */
+    get _defaultScrollTarget() {
+      return this._doc;
+    },
+
+    /**
+     * Shortcut for the document element
+     *
+     * @type {Element}
+     */
+    get _doc() {
+      return this.ownerDocument.documentElement;
+    },
+
+    /**
+     * Gets the number of pixels that the content of an element is scrolled upward.
+     *
+     * @type {number}
+     */
+    get _scrollTop() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.pageYOffset : this.scrollTarget.scrollTop;
+      }
+      return 0;
+    },
+
+    /**
+     * Gets the number of pixels that the content of an element is scrolled to the left.
+     *
+     * @type {number}
+     */
+    get _scrollLeft() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.pageXOffset : this.scrollTarget.scrollLeft;
+      }
+      return 0;
+    },
+
+    /**
+     * Sets the number of pixels that the content of an element is scrolled upward.
+     *
+     * @type {number}
+     */
+    set _scrollTop(top) {
+      if (this.scrollTarget === this._doc) {
+        window.scrollTo(window.pageXOffset, top);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollTop = top;
+      }
+    },
+
+    /**
+     * Sets the number of pixels that the content of an element is scrolled to the left.
+     *
+     * @type {number}
+     */
+    set _scrollLeft(left) {
+      if (this.scrollTarget === this._doc) {
+        window.scrollTo(left, window.pageYOffset);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollLeft = left;
+      }
+    },
+
+    /**
+     * Scrolls the content to a particular place.
+     *
+     * @method scroll
+     * @param {number} left The left position
+     * @param {number} top The top position
+     */
+    scroll: function(left, top) {
+       if (this.scrollTarget === this._doc) {
+        window.scrollTo(left, top);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollLeft = left;
+        this.scrollTarget.scrollTop = top;
+      }
+    },
+
+    /**
+     * Gets the width of the scroll target.
+     *
+     * @type {number}
+     */
+    get _scrollTargetWidth() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.innerWidth : this.scrollTarget.offsetWidth;
+      }
+      return 0;
+    },
+
+    /**
+     * Gets the height of the scroll target.
+     *
+     * @type {number}
+     */
+    get _scrollTargetHeight() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.innerHeight : this.scrollTarget.offsetHeight;
+      }
+      return 0;
+    },
+
+    /**
+     * Returns true if the scroll target is a valid HTMLElement.
+     *
+     * @return {boolean}
+     */
+    _isValidScrollTarget: function() {
+      return this.scrollTarget instanceof HTMLElement;
+    }
+  };
+
+</script>
+<script>
+  /**
+   * `Polymer.AppScrollEffectsBehavior` provides an interface that allows to consume scrolls events.
+   * Effects are installed in the `Polymer.AppLayout.scrollEffects` namescape.
+   *
+   * A few effects are defined in `app-scroll-effects.html`, but, by default, no effect is imported.
+   * Thus, users need to explicitly import the dependency.
+   *
+   * Elements that consume this behavior are required to override the folllowing methods:
+   *
+   * * `_updateScrollState`
+   * * `isOnScreen`
+   * * `isContentBelow`
+   *
+   * @polymerBehavior
+   */
+  Polymer.AppScrollEffectsBehavior = [
+    Polymer.IronScrollTargetBehavior,
+   {
+
+    properties: {
+
+      /**
+       * A space-separated list of the effects names that will be triggered when the user scrolls.
+       * e.g. `waterfall parallax-background` installs the `waterfall` and `parallax-background`.
+       */
+      effects: {
+        type: String,
+        value: ''
+      },
+
+      /**
+       * An object that configurates the effects installed via the `effects` property. e.g.
+       * ```js
+       *  element.effectsConfig = {
+       *   "blend-background": {
+       *     "startsAt": 0.5
+       *   }
+       * };
+       * ```
+       * Every effect has at least two config properties: `startsAt` and `endsAt`.
+       * These properties indicate when the event should start and end respectively
+       * and relative to the overall element progress. So for example, if `blend-background`
+       * starts at `0.5`, the effect will only start once the current element reaches 0.5
+       * of its progress. In this context, the progress is a value in the range of `[0, 1]`
+       * that indicates where this element is on the screen relative to the viewport.
+       */
+      effectsConfig: {
+        type: Object,
+        value: function() {
+          return {};
+        }
+      },
+
+      /**
+       * Disables CSS transitions and scroll effects on the element.
+       */
+      disabled: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false
+      }
+    },
+
+    observers: [
+      '_effectsChanged(effects, effectsConfig)'
+    ],
+
+    /**
+     * Updates the scroll state. This method should be overridden
+     * by the consumer of this behavior.
+     *
+     * @abstract
+     * @method _updateScrollState
+     */
+    _updateScrollState: function() {},
+
+    /**
+     * Returns true if the current element is on the screen.
+     * That is, visible in the current viewport. This method should be
+     * overridden by the consumer of this behavior.
+     *
+     * @abstract
+     * @method isOnScreen
+     * @return {boolean}
+     */
+    isOnScreen: function() {
+      return false;
+    },
+
+    /**
+     * Returns true if there's content below the current element. This method
+     * should be overridden by the consumer of this behavior.
+     *
+     * @abstract
+     * @method isContentBelow
+     * @return {boolean}
+     */
+    isContentBelow: function() {
+      return false;
+    },
+
+    /**
+     * List of effects handlers that will take place during scroll.
+     *
+     * @type {Array<Function>}
+     */
+    _effectsRunFn: null,
+
+    /**
+     * List of the effects definitions installed via the `effects` property.
+     *
+     * @type {Array<Object>}
+     */
+    _effects: null,
+
+    /**
+     * The clamped value of `_scrollTop`.
+     * @type number
+     */
+    get _clampedScrollTop() {
+      return Math.max(0, this._scrollTop);
+    },
+
+    created: function() {
+      this._effectsRunFn = [];
+      this._effects = [];
+    },
+
+    detached: function() {
+      this._tearDownEffects();
+    },
+
+    /**
+     * Creates an effect object from an effect name and configuration that can be used to run
+     * effects programmatically.
+     *
+     * @method createEffect
+     * @param {string} effectName The name of an effect defined in `Polymer.AppLayout.scrollEffects`
+     * @param {Object=} effectConfig The effect config object if the effect accepts config
+     *   values. (Optional)
+     * @return {Object} The effect object. This object has the following interface:
+     *
+     *  * `obj.setUp()`, Sets up the requirements for the effect.
+     *       This function is called automatically before the `effect` function returns.
+     *  * `obj.run(progress, y)`, Runs the effect given a `progress`.
+     *  * `obj.tearDown()`, Cleans up any DOM nodes or element references used by the effect.
+     *
+     * Example:
+     * ```js
+     * var parallax = obj.createEffect('parallax-background');
+     * // runs the effect
+     * parallax.run(0.5, 0);
+     * ```
+     */
+    createEffect: function(effectName, effectConfig) {
+      var effectDef = Polymer.AppLayout.scrollEffects[effectName];
+      if (!effectDef) {
+        throw new ReferenceError(this._getUndefinedMsg(effectName));
+        return;
+      }
+      var prop = this._boundEffect(effectDef, effectConfig || {});
+      prop.setUp();
+      return prop;
+    },
+
+    /**
+     * Called when `effects` or `effectsConfig` changes.
+     */
+    _effectsChanged: function(effects, effectsConfig) {
+      this._tearDownEffects();
+
+      if (effects === '') {
+        return;
+      }
+      effects.split(' ').forEach(function(effectName) {
+        var effectDef;
+        if (effectName !== '') {
+          if ((effectDef = Polymer.AppLayout.scrollEffects[effectName])) {
+            this._effects.push(this._boundEffect(effectDef, effectsConfig[effectName]));
+          } else {
+            this._warn(this._logf('_effectsChanged', this._getUndefinedMsg(effectName)));
+          }
+        }
+      }, this);
+
+      this._setUpEffect();
+    },
+
+    /**
+     * Forces layout
+     */
+    _layoutIfDirty: function() {
+      return this.offsetWidth;
+    },
+
+    /**
+     * Returns an effect object bound to the current context.
+     *
+     * @param {Object}
+     * @param {Object=} The effect config object if the effect accepts config values. (Optional)
+     */
+    _boundEffect: function(effectDef, effectsConfig) {
+      effectsConfig = effectsConfig || {};
+      var startsAt = parseFloat(effectsConfig.startsAt || 0);
+      var endsAt = parseFloat(effectsConfig.endsAt || 1);
+      var deltaS = endsAt - startsAt;
+      var noop = Function();
+      // fast path if possible
+      var runFn = (startsAt === 0 && endsAt === 1) ? effectDef.run :
+        function(progress, y) {
+          effectDef.run.call(this,
+              Math.max(0, (progress - startsAt) / deltaS), y);
+        };
+      return {
+        setUp: effectDef.setUp ? effectDef.setUp.bind(this, effectsConfig) : noop,
+        run: effectDef.run ? runFn.bind(this) : noop,
+        tearDown: effectDef.tearDown ? effectDef.tearDown.bind(this) : noop
+      };
+    },
+
+    /**
+     * Sets up the effects.
+     */
+    _setUpEffect: function() {
+      if (this.isAttached) {
+        this._effectsRunFn = [];
+        this._effects.forEach(function(effectDef) {
+          // install the effect only if no error was reported
+          if (effectDef.setUp() !== false) {
+            this._effectsRunFn.push(effectDef.run);
+          }
+        }, this);
+      }
+    },
+
+    /**
+     * Tears down the effects.
+     */
+    _tearDownEffects: function() {
+      this._effects.forEach(function(effectDef) {
+        effectDef.tearDown();
+      });
+      this._effectsRunFn = [];
+      this._effects = [];
+    },
+
+    /**
+     * Runs the effects.
+     *
+     * @param {number} The progress
+     * @param {number} The top position of the current element relative to the viewport.
+     */
+    _runEffects: function(p, y) {
+      this._effectsRunFn.forEach(function(run) {
+        run(p, y);
+      });
+    },
+
+    /**
+     * Overrides the `_scrollHandler`.
+     */
+    _scrollHandler: function() {
+      if (!this.disabled) {
+        this._updateScrollState(this._clampedScrollTop);
+      }
+    },
+
+    _getUndefinedMsg: function(effectName) {
+      return 'Scroll effect `' + effectName +
+          '` is undefined. Did you forget to import the effects?';
+    }
+
+  }];
+
+</script>
+
+
+<dom-module id="app-header" assetpath="../../bower_components/app-layout/app-header/">
+  <style>
+
+    :host {
+      position: relative;
+      display: block;
+      transition-property: -webkit-transform;
+      transition-property: transform;
+      transition-timing-function: linear;
+    }
+
+    :host::after {
+      content: "";
+      position: absolute;
+      left: 0px;
+      right: 0px;
+      bottom: -5px;
+      width: 100%;
+      height: 5px;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: inset 0px 5px 6px -3px rgba(0, 0, 0, 0.4);
+      will-change: opacity;
+      transition: opacity 0.4s;
+      @apply(--app-header-shadow);
+    }
+
+    :host([shadow])::after {
+      opacity: 1;
+    }
+
+    #contentContainer > ::content [condensed-title] {
+      opacity: 0;
+      white-space: nowrap;
+      -webkit-transform-origin: left top;
+      transform-origin: left top;
+    }
+
+    #contentContainer > ::content [title] {
+      white-space: nowrap;
+      -webkit-transform-origin: left top;
+      transform-origin: left top;
+    }
+
+    #background {
+      @apply(--layout-fit);
+      overflow: hidden;
+    }
+
+    #backgroundFrontLayer,
+    #backgroundRearLayer {
+      @apply(--layout-fit);
+      pointer-events: none;
+      background-size: cover;
+      height: 100%;
+    }
+
+    #backgroundFrontLayer {
+      @apply(--app-header-background-front-layer);
+    }
+
+    #backgroundRearLayer {
+      @apply(--app-header-background-rear-layer);
+      opacity: 0;
+    }
+
+    #contentContainer {
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    :host([disabled]),
+    :host([disabled])::after,
+    :host([disabled]) #backgroundFrontLayer,
+    :host([disabled]) #backgroundRearLayer,
+    :host([disabled]) ::content > app-toolbar:first-of-type,
+    :host([disabled]) ::content > [primary],
+    /* Silent scrolling should not run CSS transitions */
+    :host-context(.app-layout-silent-scroll),
+    :host-context(.app-layout-silent-scroll)::after,
+    :host-context(.app-layout-silent-scroll) #backgroundFrontLayer,
+    :host-context(.app-layout-silent-scroll) #backgroundRearLayer,
+    :host-context(.app-layout-silent-scroll) ::content > app-toolbar:first-of-type,
+    :host-context(.app-layout-silent-scroll) ::content > [primary] {
+      transition: none !important;
+    }
+
+  </style>
+
+  <template>
+    <div id="background">
+      <div id="backgroundRearLayer"></div>
+      <div id="backgroundFrontLayer"></div>
+    </div>
+    <div id="contentContainer">
+      <content id="content"></content>
+    </div>
+  </template>
+
+  <script>
+
+    Polymer({
+
+      is: 'app-header',
+
+      behaviors: [
+        Polymer.AppScrollEffectsBehavior,
+        Polymer.IronResizableBehavior
+      ],
+
+      properties: {
+
+        /**
+         * If true, the header will automatically collapse when scrolling down.
+         * That is, the `primary` element remains visible when the header is fully condensed
+         * whereas the rest of the elements will collapse below `primary` element.
+         *
+         * By default, the `primary` element is the first toolbar in the light DOM:
+         *
+         *```html
+         * <app-header condenses>
+         *   <app-toolbar>This toolbar remains on top</app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         * </app-header>
+         * ```
+         *
+         * Additionally, you can specify which toolbar or element remains visible in condensed mode
+         * by adding the `primary` attribute to that element. For example: if we want the last
+         * toolbar to remain visible, we can add the `primary` attribute to it.
+         *
+         *```html
+         * <app-header condenses>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar primary>This toolbar remains on top</app-toolbar>
+         * </app-header>
+         * ```
+         *
+         * Note the `primary` element must be a child of `app-header`.
+         */
+        condenses: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Mantains the header fixed at the top so it never moves away.
+         */
+        fixed: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Slides back the header when scrolling back up.
+         */
+        reveals: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Displays a shadow below the header.
+         */
+        shadow: {
+          type: Boolean,
+          reflectToAttribute: true,
+          value: false
+        }
+
+      },
+
+      observers: [
+        'resetLayout(isAttached, condenses, fixed)'
+      ],
+
+      listeners: {
+        'iron-resize': '_resizeHandler'
+      },
+
+      /**
+       * A cached offsetHeight of the current element.
+       *
+       * @type {number}
+       */
+      _height: 0,
+
+      /**
+       * The distance in pixels the header will be translated to when scrolling.
+       *
+       * @type {number}
+       */
+      _dHeight: 0,
+
+      /**
+       * The offsetTop of `_primaryEl`
+       *
+       * @type {number}
+       */
+      _primaryElTop: 0,
+
+      /**
+       * The element that remains visible when the header condenses.
+       *
+       * @type {Element}
+       */
+      _primaryEl: null,
+
+      /**
+       * The header's top value used for the `transformY`
+       *
+       * @type {number}
+       */
+      _top: 0,
+
+      /**
+       * The current scroll progress.
+       *
+       * @type {number}
+       */
+      _progress: 0,
+
+      _wasScrollingDown: false,
+      _initScrollTop: 0,
+      _initTimestamp: 0,
+      _lastTimestamp: 0,
+      _lastScrollTop: 0,
+
+      /**
+       * The distance the header is allowed to move away.
+       *
+       * @type {number}
+       */
+      get _maxHeaderTop() {
+        return this.fixed ? this._dHeight : this._height + 5;
+      },
+
+      /**
+       * Returns a reference to the element that remains visible when the header condenses.
+       *
+       * @return {HTMLElement}?
+       */
+      _getPrimaryEl: function() {
+        var primaryEl;
+        var nodes = Polymer.dom(this.$.content).getDistributedNodes();
+
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].nodeType === Node.ELEMENT_NODE) {
+            if (nodes[i].hasAttribute('primary')) {
+              return nodes[i];
+            } else if (!primaryEl) {
+              primaryEl = nodes[i];
+            }
+          }
+        }
+        return primaryEl;
+      },
+
+      /**
+       * Resets the layout. This method is automatically called when the element is attached to the DOM.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+
+        this.fire('app-header-reset-layout');
+
+        this.debounce('_resetLayout', function() {
+          // noop if the header isn't visible
+          if (this.offsetWidth === 0 && this.offsetHeight === 0) {
+            return;
+          }
+
+          var scrollTop = this._clampedScrollTop;
+          var firstSetup = this._height === 0 || scrollTop === 0;
+          var currentDisabled = this.disabled;
+
+          this._height = this.offsetHeight;
+          this._primaryEl = this._getPrimaryEl();
+          this.disabled = true;
+
+          // prepare for measurement
+          if  (!firstSetup) {
+            this._updateScrollState(0, true);
+          }
+
+          if (this._mayMove()) {
+            this._dHeight = this._primaryEl ? this._height - this._primaryEl.offsetHeight : 0;
+          } else {
+            this._dHeight = 0;
+          }
+
+          this._primaryElTop = this._primaryEl ? this._primaryEl.offsetTop : 0;
+          this._setUpEffect();
+
+          if (firstSetup) {
+            this._updateScrollState(scrollTop, true);
+          } else {
+            this._updateScrollState(this._lastScrollTop, true);
+            this._layoutIfDirty();
+          }
+          // restore no transition
+          this.disabled = currentDisabled;
+        });
+      },
+
+      /**
+       * Updates the scroll state.
+       *
+       * @param {number}
+       * @param {boolean}
+       */
+      _updateScrollState: function(scrollTop, forceUpdate) {
+        if (this._height === 0) {
+          return;
+        }
+
+        var progress = 0;
+        var top = 0;
+        var lastTop = this._top;
+        var lastScrollTop = this._lastScrollTop;
+        var maxHeaderTop = this._maxHeaderTop;
+        var dScrollTop = scrollTop - this._lastScrollTop;
+        var absDScrollTop = Math.abs(dScrollTop);
+        var isScrollingDown = scrollTop > this._lastScrollTop;
+        var now = Date.now();
+
+        if (this._mayMove()) {
+          top = this._clamp(this.reveals ? lastTop + dScrollTop : scrollTop, 0, maxHeaderTop);
+        }
+
+        if (scrollTop >= this._dHeight) {
+          top = this.condenses ? Math.max(this._dHeight, top) : top;
+          this.style.transitionDuration = '0ms';
+        }
+
+        if (this.reveals && !this.disabled && absDScrollTop < 100) {
+          // set the initial scroll position
+          if (now - this._initTimestamp > 300 || this._wasScrollingDown !== isScrollingDown) {
+            this._initScrollTop = scrollTop;
+            this._initTimestamp = now;
+          }
+
+          if (scrollTop >= maxHeaderTop) {
+            // check if the header is allowed to snap
+            if (Math.abs(this._initScrollTop - scrollTop) > 30 || absDScrollTop > 10) {
+              if (isScrollingDown && scrollTop >= maxHeaderTop) {
+                top = maxHeaderTop;
+              } else if (!isScrollingDown && scrollTop >= this._dHeight) {
+                top = this.condenses ? this._dHeight : 0;
+              }
+
+              var scrollVelocity = dScrollTop / (now - this._lastTimestamp);
+              this.style.transitionDuration = this._clamp((top - lastTop) / scrollVelocity, 0, 300) + 'ms';
+            } else {
+              top = this._top;
+            }
+          }
+        }
+
+        if (this._dHeight === 0) {
+          progress = scrollTop > 0 ? 1 : 0;
+        } else {
+          progress = top / this._dHeight;
+        }
+
+        if (!forceUpdate) {
+          this._lastScrollTop = scrollTop;
+          this._top = top;
+          this._wasScrollingDown = isScrollingDown;
+          this._lastTimestamp = now;
+        }
+
+        if (forceUpdate || progress !== this._progress || lastTop !== top || scrollTop === 0) {
+          this._progress = progress;
+          this._runEffects(progress, top);
+          this._transformHeader(top);
+        }
+      },
+
+      /**
+       * Returns true if the current header is allowed to move as the user scrolls.
+       *
+       * @return {boolean}
+       */
+      _mayMove: function() {
+        return this.condenses || !this.fixed;
+      },
+
+      /**
+       * Returns true if the current header will condense based on the size of the header
+       * and the `consenses` property.
+       *
+       * @return {boolean}
+       */
+      willCondense: function() {
+        return this._dHeight > 0 && this.condenses;
+      },
+
+      /**
+       * Returns true if the current element is on the screen.
+       * That is, visible in the current viewport.
+       *
+       * @method isOnScreen
+       * @return {boolean}
+       */
+      isOnScreen: function() {
+        return this._height !== 0 && this._top < this._height;
+      },
+
+      /**
+       * Returns true if there's content below the current element.
+       *
+       * @method isContentBelow
+       * @return {boolean}
+       */
+      isContentBelow: function() {
+        if (this._top === 0) {
+          return this._clampedScrollTop > 0;
+        }
+
+        return this._clampedScrollTop - this._maxHeaderTop >= 0;
+      },
+
+      /**
+       * Transforms the header.
+       *
+       * @param {number}
+       */
+      _transformHeader: function(y) {
+        this.translate3d(0, (-y) + 'px', 0);
+
+        if (this._primaryEl && this.condenses && y >= this._primaryElTop) {
+          this.translate3d(0, (Math.min(y, this._dHeight) - this._primaryElTop) + 'px', 0,
+              this._primaryEl);
+        }
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      },
+
+      _clamp: function(v, min, max) {
+        return Math.min(max, Math.max(min, v));
+      },
+
+      /**
+       * Returns an object containing the progress value of the scroll effects
+       * and the top position of the header.
+       *
+       * @method getScrollState
+       * @return {Object}
+       */
+      getScrollState: function() {
+        return { progress: this._progress, top: this._top };
+      }
+
+      /**
+       * Fires when the layout of `app-header` changed.
+       *
+       * @event app-header-reset-layout
+       */
+    });
+
+  </script>
+
+</dom-module>
+
+
+<dom-module id="app-header-layout" assetpath="../../bower_components/app-layout/app-header-layout/">
+
+  <style>
+
+    :host {
+      display: block;
+    }
+
+    :host([has-scrolling-region]) {
+      position: relative;
+      height: 100%;
+    }
+
+    :host > ::content > app-header,
+    :host > ::content > [underlay-content] {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: 0;
+    }
+
+    :host([has-scrolling-region]) > ::content > app-header,
+    :host([has-scrolling-region]) > ::content > [underlay-content] {
+      position: absolute;
+    }
+
+    :host([has-scrolling-region]) > #contentContainer {
+      @apply(--layout-fit);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #contentContainer {
+      position: relative;
+      overflow-y: hidden;
+      @apply(--app-header-layout-content);
+    }
+
+  </style>
+
+  <template>
+
+    <content id="underlayContent" select="[underlay-content]"></content>
+
+    <div id="contentContainer">
+      <content select=":not(app-header):not([app-header-overlay])"></content>
+    </div>
+
+    <content id="header" select="app-header"></content>
+
+    <content select="[app-header-overlay]"></content>
+
+  </template>
+
+  <script>
+
+    Polymer({
+
+      is: 'app-header-layout',
+
+      behaviors: [
+        Polymer.IronResizableBehavior
+      ],
+
+      properties: {
+
+        /**
+         * If true, the current element will have its own scrolling region.
+         * Otherwise, it will use the document scroll to control the header.
+         */
+        hasScrollingRegion: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        }
+
+      },
+
+      listeners: {
+        'iron-resize': '_resizeHandler',
+        'app-header-reset-layout': 'resetLayout'
+      },
+
+      observers: [
+        'resetLayout(isAttached, hasScrollingRegion)'
+      ],
+
+      get header() {
+        return Polymer.dom(this.$.header).getDistributedNodes()[0];
+      },
+
+      /**
+       * Resets the layout. This method is automatically called when the element is attached to the DOM.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this._updateScroller();
+        this.debounce('_resetLayout', function() {
+          this._updateContentPosition();
+          this._updateFixedNodesPosition();
+        });
+      },
+
+      _getFixedNodes: function() {
+        return Polymer.dom(this.$.header).getDistributedNodes().
+            concat(Polymer.dom(this.$.underlayContent).getDistributedNodes());
+      },
+
+      _updateContentPosition: function() {
+        var header = this.header;
+        var containerStyle = this.$.contentContainer.style;
+        if (!this.isAttached || !header) {
+          return;
+        }
+
+        this._headerHeight = header.offsetHeight;
+
+        if (header.fixed && !header.willCondense() && this.hasScrollingRegion) {
+          containerStyle.marginTop = this._headerHeight + 'px';
+          containerStyle.paddingTop = '';
+        } else {
+          containerStyle.paddingTop = this._headerHeight + 'px';
+          containerStyle.marginTop = '';
+        }
+      },
+
+      _updateFixedNodesPosition: function() {
+        var rect = this.getBoundingClientRect();
+        var rightOffset = document.documentElement.clientWidth - rect.right;
+
+        this._getFixedNodes().forEach(function(node) {
+          node.style.left = this.hasScrollingRegion ? '' : rect.left + 'px';
+          node.style.right = this.hasScrollingRegion ? '' : rightOffset + 'px';
+        }.bind(this));
+      },
+
+      _updateScroller: function() {
+        if (!this.isAttached) {
+          return;
+        }
+        var header = this.header;
+        if (header) {
+          header.scrollTarget = this.hasScrollingRegion ? 
+              this.$.contentContainer : this.ownerDocument.documentElement;
+        }
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      }
+
+    });
+
+  </script>
+
+</dom-module>
+
+
+<dom-module id="app-scrollpos-control" assetpath="../../bower_components/app-layout/app-scrollpos-control/">
+
+  <script>
+
+    Polymer({
+
+      is: 'app-scrollpos-control',
+
+      properties: {
+
+        /**
+         * The selected page.
+         */
+        selected: {
+          type: String,
+          observer: '_selectedChanged'
+        },
+
+        /**
+         * Reset the scroll position to 0.
+         */
+        reset: {
+          type: Boolean,
+          value: false
+        }
+
+      },
+
+      observers: [
+        '_updateScrollPos(selected, reset)'
+      ],
+
+      created: function() {
+        this._scrollposMap = {};
+      },
+
+      _selectedChanged: function(selected, old) {
+        if (old != null) {
+          this._scrollposMap[old] = {x: window.pageXOffset, y: window.pageYOffset};
+        }
+      },
+
+      _updateScrollPos: function(selected, reset) {
+        this.debounce('_updateScrollPos', function() {
+          var pos = this._scrollposMap[this.selected];
+          if (pos != null && !this.reset) {
+            this._scrollTo(pos.x, pos.y);
+          } else {
+            this._scrollTo(0, 0);
+          }
+        });
+      },
+
+      _scrollTo: function(x, y) {
+        Polymer.AppLayout.scroll({
+          left: x,
+          top: y,
+          behavior: 'silent'
+        });
+      }
+
+    });
+
+  </script>
+
+</dom-module>
+
+
+<dom-module id="app-toolbar" assetpath="../../bower_components/app-layout/app-toolbar/">
+
+  <template>
+
+    <style>
+
+      :host {
+        @apply(--layout-horizontal);
+        @apply(--layout-center);
+        height: 64px;
+        padding: 0 16px;
+        position: relative;
+        pointer-events: none;
+        font-size: var(--app-toolbar-font-size, 20px);
+      }
+
+      :host > ::content > * {
+        pointer-events: auto;
+      }
+
+      :host > ::content > paper-icon-button {
+        /* paper-icon-button/issues/33 */
+        font-size: 0;
+      }
+
+      :host > ::content > [title],
+      :host > ::content > [condensed-title] {
+        @apply(--layout-flex);
+        pointer-events: none;
+      }
+
+      :host > ::content > [bottom-item] {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      :host > ::content > [top-item] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+      }
+
+      :host > ::content > [spacer] {
+        margin-left: 64px;
+      }
+
+    </style>
+
+    <content></content>
+
+  </template>
+
+  <script>
+
+    Polymer({
+
+      is: 'app-toolbar'
+
+    });
+
+  </script>
+
+</dom-module>
+
+
+<dom-module id="app-box" assetpath="../../bower_components/app-layout/app-box/">
+  <style>
+
+    :host {
+      display: block;
+      position: relative;
+    }
+
+    #background {
+      @apply(--layout-fit);
+      overflow: hidden;
+      height: 100%;
+    }
+
+    #backgroundFrontLayer {
+      pointer-events: none;
+      background-size: cover;
+      min-height: 100%;
+      @apply(--app-box-background-front-layer);
+    }
+
+    #contentContainer {
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    :host([disabled]),
+    :host([disabled]) #backgroundFrontLayer {
+      transition: none !important;
+    }
+
+  </style>
+
+  <template>
+    <div id="background">
+      <div id="backgroundFrontLayer">
+        <content select="[background]"></content>
+      </div>
+    </div>
+    <div id="contentContainer">
+      <content id="content"></content>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+
+      is: 'app-box',
+
+      behaviors: [
+        Polymer.AppScrollEffectsBehavior,
+        Polymer.IronResizableBehavior
+      ],
+
+      listeners: {
+        'iron-resize': '_resizeHandler'
+      },
+
+      /**
+       * The current scroll progress.
+       *
+       * @type {number}
+       */
+      _progress: 0,
+
+      attached: function() {
+        this.resetLayout();
+      },
+
+      /**
+       * Resets the layout. This method is automatically called when the element is attached to the DOM.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this.debounce('_resetLayout', function() {
+          // noop if the box isn't in the rendered tree
+          if (this.offsetWidth === 0 && this.offsetHeight === 0) {
+            return;
+          }
+
+          var scrollTop = this._clampedScrollTop;
+          var savedDisabled = this.disabled;
+
+          this.disabled = true;
+          this._elementTop = this._getElementTop();
+          this._elementHeight = this.offsetHeight;
+          this._cachedScrollTargetHeight = this._scrollTargetHeight;
+          this._setUpEffect();
+          this._updateScrollState(scrollTop);
+          this.disabled = savedDisabled;
+        }, 1);
+      },
+
+      _getElementTop: function() {
+        var currentNode = this;
+        var top = 0;
+
+        while (currentNode && currentNode !== this.scrollTarget) {
+          top += currentNode.offsetTop;
+          currentNode = currentNode.offsetParent;
+        }
+        return top;
+      },
+
+      _updateScrollState: function(scrollTop) {
+        if (this.isOnScreen()) {
+          var viewportTop = this._elementTop - scrollTop;
+          this._progress = 1 - (viewportTop + this._elementHeight) / this._cachedScrollTargetHeight;
+          this._runEffects(this._progress, scrollTop);
+        }
+      },
+
+      /**
+       * Returns true if this app-box is on the screen.
+       * That is, visible in the current viewport.
+       *
+       * @method setup
+       * @return {boolean}
+       */
+
+      isOnScreen: function() {
+        return this._elementTop < this._scrollTop + this._cachedScrollTargetHeight
+            && this._elementTop + this._elementHeight > this._scrollTop;
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      },
+
+      /**
+       * Returns an object containing the progress value of the scroll effects.
+       *
+       * @method getScrollState
+       * @return {Object}
+       */
+      getScrollState: function() {
+        return { progress: this._progress };
+      }
+
+    });
+  </script>
+
+</dom-module>
+<iron-iconset-svg name="social" size="24">
+<svg><defs>
+<g id="cake"><path d="M12 6c1.11 0 2-.9 2-2 0-.38-.1-.73-.29-1.03L12 0l-1.71 2.97c-.19.3-.29.65-.29 1.03 0 1.1.9 2 2 2zm4.6 9.99l-1.07-1.07-1.08 1.07c-1.3 1.3-3.58 1.31-4.89 0l-1.07-1.07-1.09 1.07C6.75 16.64 5.88 17 4.96 17c-.73 0-1.4-.23-1.96-.61V21c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-4.61c-.56.38-1.23.61-1.96.61-.92 0-1.79-.36-2.44-1.01zM18 9h-5V7h-2v2H6c-1.66 0-3 1.34-3 3v1.54c0 1.08.88 1.96 1.96 1.96.52 0 1.02-.2 1.38-.57l2.14-2.13 2.13 2.13c.74.74 2.03.74 2.77 0l2.14-2.13 2.13 2.13c.37.37.86.57 1.38.57 1.08 0 1.96-.88 1.96-1.96V12C21 10.34 19.66 9 18 9z"></path></g>
+<g id="domain"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"></path></g>
+<g id="group"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></g>
+<g id="group-add"><path d="M8 10H5V7H3v3H0v2h3v3h2v-3h3v-2zm10 1c1.66 0 2.99-1.34 2.99-3S19.66 5 18 5c-.32 0-.63.05-.91.14.57.81.9 1.79.9 2.86s-.34 2.04-.9 2.86c.28.09.59.14.91.14zm-5 0c1.66 0 2.99-1.34 2.99-3S14.66 5 13 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm6.62 2.16c.83.73 1.38 1.66 1.38 2.84v2h3v-2c0-1.54-2.37-2.49-4.38-2.84zM13 13c-2 0-6 1-6 3v2h12v-2c0-2-4-3-6-3z"></path></g>
+<g id="location-city"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"></path></g>
+<g id="mood"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path></g>
+<g id="mood-bad"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 3c-2.33 0-4.31 1.46-5.11 3.5h10.22c-.8-2.04-2.78-3.5-5.11-3.5z"></path></g>
+<g id="notifications"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"></path></g>
+<g id="notifications-active"><path d="M7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42zm12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42zM18 11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2v-5zm-6 11c.14 0 .27-.01.4-.04.65-.14 1.18-.58 1.44-1.18.1-.24.15-.5.15-.78h-4c.01 1.1.9 2 2.01 2z"></path></g>
+<g id="notifications-none"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"></path></g>
+<g id="notifications-off"><path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11h-.01c-.01 0-.01 0-.02.01-.23.09-.46.2-.68.31 0 0-.01 0-.01.01L18 14.68z"></path></g>
+<g id="notifications-paused"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.93 6 11v5l-2 2v1h16v-1l-2-2zm-3.5-6.2l-2.8 3.4h2.8V15h-5v-1.8l2.8-3.4H9.5V8h5v1.8z"></path></g>
+<g id="pages"><path d="M3 5v6h5L7 7l4 1V3H5c-1.1 0-2 .9-2 2zm5 8H3v6c0 1.1.9 2 2 2h6v-5l-4 1 1-4zm9 4l-4-1v5h6c1.1 0 2-.9 2-2v-6h-5l1 4zm2-14h-6v5l4-1-1 4h5V5c0-1.1-.9-2-2-2z"></path></g>
+<g id="party-mode"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 3c1.63 0 3.06.79 3.98 2H12c-1.66 0-3 1.34-3 3 0 .35.07.69.18 1H7.1c-.06-.32-.1-.66-.1-1 0-2.76 2.24-5 5-5zm0 10c-1.63 0-3.06-.79-3.98-2H12c1.66 0 3-1.34 3-3 0-.35-.07-.69-.18-1h2.08c.07.32.1.66.1 1 0 2.76-2.24 5-5 5z"></path></g>
+<g id="people"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></g>
+<g id="people-outline"><path d="M16.5 13c-1.2 0-3.07.34-4.5 1-1.43-.67-3.3-1-4.5-1C5.33 13 1 14.08 1 16.25V19h22v-2.75c0-2.17-4.33-3.25-6.5-3.25zm-4 4.5h-10v-1.25c0-.54 2.56-1.75 5-1.75s5 1.21 5 1.75v1.25zm9 0H14v-1.25c0-.46-.2-.86-.52-1.22.88-.3 1.96-.53 3.02-.53 2.44 0 5 1.21 5 1.75v1.25zM7.5 12c1.93 0 3.5-1.57 3.5-3.5S9.43 5 7.5 5 4 6.57 4 8.5 5.57 12 7.5 12zm0-5.5c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 5.5c1.93 0 3.5-1.57 3.5-3.5S18.43 5 16.5 5 13 6.57 13 8.5s1.57 3.5 3.5 3.5zm0-5.5c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"></path></g>
+<g id="person"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></g>
+<g id="person-add"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></g>
+<g id="person-outline"><path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"></path></g>
+<g id="plus-one"><path d="M10 8H8v4H4v2h4v4h2v-4h4v-2h-4zm4.5-1.92V7.9l2.5-.5V18h2V5z"></path></g>
+<g id="poll"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"></path></g>
+<g id="public"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"></path></g>
+<g id="school"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"></path></g>
+<g id="share"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"></path></g>
+<g id="whatshot"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"></path></g>
+</defs></svg>
+</iron-iconset-svg>
+<dom-module id="profile-button" assetpath="profile-button/">
+  <style is="custom-style">
+    .round {
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .loggedout {
+      background-color: blue;
+      color: white;
+    }
+  </style>
+  
+  <template>
+    <paper-icon-button icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'profile-button'
+    });
+  </script>
+</dom-module><dom-module id="dialog-login" assetpath="dialog-login/">
+  <style is="custom-style">
+    
+  </style>
+  <template>
+    <paper-dialog id="loginDialog" modal="">
+      <h2>Login</h2>
+      <div>Dialog body</div>
+      <div class="buttons">
+        <paper-button dialog-dismiss="">Cancel</paper-button>
+        <paper-button>Login</paper-button>
+      </div>
+    </paper-dialog>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'dialog-login'
+    });
+  </script>
+</dom-module><dom-module id="page-events" assetpath="page-events/">
+  <style is="custom-style">
+    h3 {
+      text-align: center;
+    }
+  </style>
+  
+  <template>
+    <h3>Events Page</h3>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'page-events'
+    });
+  </script>
+</dom-module><dom-module id="page-profile" assetpath="page-profile/">
+  <style is="custom-style">
+    h3 {
+      text-align: center;
+    }
+  </style>
+  
+  <template>
+    <h3>Profile Page</h3>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'page-profile'
+    });
+  </script>
+</dom-module><lint rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
+
+
+<dom-module id="events-app" assetpath="events-app/">
+  
+  <style is="custom-style">
+    app-header {
+      background-color: #4FB6F7;
+      color: #fff;
+    }
+    body {
+      margin: 0;
+      font-family: 'Roboto', 'Noto', sans-serif;
+      background-color: #fafafa;
+    }
+    app-header paper-icon-button {
+      --paper-icon-button-ink-color: white;
+    }
+    @media (min-width: 801px) {
+      .narrow-only {
+        display: none !important;
+      }
+    }
+  </style>
+  <template>
+    <template is="dom-bind" id="app">
+      <carbon-location route="{{route}}"></carbon-location>
+      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}"></carbon-route>
+    
+      <app-drawer-layout force-narrow="" narrow="">
+        <app-drawer id="startDrawer" align="start">
+          <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
+            <paper-item data-url="events">Events</paper-item>
+            <paper-item data-url="profile">Profile</paper-item>
+          </paper-menu>
+        </app-drawer>
+        <app-header-layout>
+          <app-header fixed="">
+            <app-toolbar>
+              <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
+              <div title="">Event Planner</div>
+              <profile-button></profile-button>
+            </app-toolbar>
+          </app-header>
+          <iron-pages attr-for-selected="id" selected="{{data.page}}">
+            <page-events id="events"></page-events>
+            <page-profile id="profile"></page-profile>
+          </iron-pages>
+        </app-header-layout>
+      </app-drawer-layout>
+    </template>
+  </template>
+  <script>
+    Polymer({
+      is: 'events-app'
+    });
+  </script>
+</dom-module></lint></div></body></html>

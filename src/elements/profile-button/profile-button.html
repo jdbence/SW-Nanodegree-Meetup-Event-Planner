@@ -1,0 +1,26 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../../bower_components/iron-icons/social-icons.html">
+
+<dom-module id="profile-button">
+  <style is="custom-style">
+    .round {
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .loggedout {
+      background-color: blue;
+      color: white;
+    }
+  </style>
+  
+  <template>
+    <paper-icon-button icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'profile-button'
+    });
+  </script>
+</dom-module>

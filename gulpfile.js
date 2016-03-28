@@ -9,6 +9,7 @@ var gulp = require('gulp'),
   vulcanize = require('gulp-vulcanize'),
   browserSync = require('browser-sync'),
   reload = browserSync.reload,
+  history = require('connect-history-api-fallback'),
   del = require('del'),
   config = require('./config');
 
@@ -85,7 +86,8 @@ gulp.task('live', function () {
         '/bower_components': 'bower_components',
         '/styles': 'dist/styles'
       }
-    }
+    },
+    middleware: [history()]
   });
   // changes in src should recompile and reload
   gulp.watch(config.src + '/**/*.html', ['html', 'vulcanize', reload]);
