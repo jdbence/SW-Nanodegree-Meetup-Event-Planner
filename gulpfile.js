@@ -93,6 +93,7 @@ gulp.task('live', function () {
   gulp.watch(config.src + '/styles/**/*.scss', ['styles', reload]);
 });
 
+// scrape all Polymer elements
 gulp.task('vulcanize', function() {
   return gulp.src(config.src + '/elements/elements.html')
     .pipe(vulcanize({
