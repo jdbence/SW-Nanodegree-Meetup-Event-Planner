@@ -34,16 +34,17 @@ SPA allows users to create new meetup events
 
 ```node
 //  Install local dependencies
-npm install
-bower install
+npm install && bower install
 ```
 
 ### Gulp Tasks
 
 ```node
-//  Start live editing
+// Start live editing
 gulp live
-// Empties the dist folder
+// Build dist version
+gulp
+// Empties dist folder
 gulp clean
 ```
 
