@@ -1,6 +1,5 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/firebase-element/firebase-auth.html">
-<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/paper-button/paper-button.html">
 <link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="../../../bower_components/iron-icons/social-icons.html">
@@ -10,7 +9,7 @@
     
   </style>
   <template>
-    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler" on-login="loginHandler"></firebase-auth>
+    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler"></firebase-auth>
     <paper-dialog id="loginDialog" modal>
       <h2>Login</h2>
       <div>Dialog body</div>
@@ -63,18 +62,13 @@
        *
        */
       loginGoogle: function() {
-          console.log('loginGoogle');
+        console.log('loginGoogle');
         this.provider = 'google';
         this.$.firebaseLogin.login();
       },
   
       errorHandler: function(e) {
         // 'Error: ' + e.detail.message;
-      },
-  
-      loginHandler: function(e) {
-        console.log('loginHandler', e);
-        // e.type + ' success!';
       }
     });
   </script>

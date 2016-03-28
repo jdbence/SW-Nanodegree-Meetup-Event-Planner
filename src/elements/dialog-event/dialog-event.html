@@ -1,0 +1,37 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+
+<dom-module id="dialog-event">
+  <style is="custom-style">
+    
+  </style>
+  <template>
+    <paper-dialog id="eventDialog" modal>
+      <h2>Create Event</h2>
+      <div>Dialog body</div>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button on-tap="handleCreate">Create</paper-button>
+      </div>
+    </paper-dialog>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'dialog-event',
+      
+      handleCreate: function() {
+        //TODO: check form validation before sending create event
+        this.fire('create', {
+          description: "another",
+          end: "03/22/2016",
+          host: "google:106848061966232824657",
+          location: "Google Plex",
+          start: "03/22/2016",
+          title: "Next Meeting",
+          type: "meeting"
+        });
+      }
+    });
+  </script>
+</dom-module>

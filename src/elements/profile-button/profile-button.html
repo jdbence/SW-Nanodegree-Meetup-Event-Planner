@@ -94,13 +94,6 @@
       
       profileName: function(user) {
         return user && user.google ? user.google.displayName : '';
-      },
-  
-      computeLoginStatus: function(statusKnown, user) {
-        if (statusKnown) {
-          return 'Logged ' + (user ? 'in' : 'out');
-        }
-        return 'Unknown (checking status...)';
       }
     });
   </script>
