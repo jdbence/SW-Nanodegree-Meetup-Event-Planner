@@ -1,0 +1,57 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+
+<link rel="import" href="../../../bower_components/iron-pages/iron-pages.html">
+<link rel="import" href="../../../bower_components/paper-header-panel/paper-header-panel.html">
+<link rel="import" href="../../../bower_components/paper-drawer-panel/paper-drawer-panel.html">
+<link rel="import" href="../../../bower_components/paper-toolbar/paper-toolbar.html">
+<link rel="import" href="../../../bower_components/paper-material/paper-material.html">
+<link rel="import" href="../../../bower_components/paper-menu/paper-menu.html">
+<link rel="import" href="../../../bower_components/paper-item/paper-item.html">
+<lint rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
+
+<dom-module id="events-app">
+  
+  <template is="dom-bind">
+    <paper-drawer-panel>
+      <paper-header-panel drawer>
+        <paper-toolbar>
+          <div>Meet-up Event Planner</div>
+        </paper-toolbar>
+        <paper-menu>
+          <paper-item>This is content 1</paper-item>
+          <paper-item>This is content 2</paper-item>
+          <paper-item>This is content 3</paper-item>
+        </paper-menu>
+      </paper-header-panel>
+        
+      <paper-header-panel main>
+        <paper-toolbar>
+          <paper-button>
+            <iron-icon icon="menu" paper-drawer-toggle/>
+          </paper-button>
+          <div>Title</div>
+        </paper-toolbar>
+        <paper-material style="background-color: white; overflow: auto;">
+          <h1>Hello World</h1>
+          <input list="list"/>
+          <datalist id="list">
+            <option value="Party"/>
+            <option value="Meeting"/>
+            <option value="Conference Talk"/>
+            <option value="Sports Game"/>
+          </datalist>
+          <label for="phone">
+            <span>Telephone Number</span>
+            <input type="tel" id="phone" placeHolder="test" autofocus />
+          </label>
+        </paper-material>
+      </paper-header-panel>
+    </paper-drawer-panel>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'events-app'
+    });
+  </script>
+</dom-module>
