@@ -14,7 +14,7 @@ var gulp = require('gulp'),
   config = require('./config');
 
 // builds html and styles
-gulp.task('default', ['html', 'styles', 'lint', 'scripts:prod']);
+gulp.task('default', ['html', 'vulcanize', 'styles', 'lint', 'scripts:prod']);
 
 // lint JS files when attempting to commit changes to git
 gulp.task('pre-commit', ['lint']);
