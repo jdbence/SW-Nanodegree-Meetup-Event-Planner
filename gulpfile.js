@@ -87,12 +87,6 @@ gulp.task('live', function () {
       }
     }
   });
-  // listen for file changes
-  // gulp.watch([
-  //   config.dist + '/*.html',
-  //   config.dist + '/img/**/*',
-  //   config.dist + '/js/**/*.js'
-  // ]).on('change', reload);
   // changes in src should recompile and reload
   gulp.watch(config.src + '/**/*.html', ['html', 'vulcanize', reload]);
   gulp.watch(config.src + '/js/**/*.js', ['lint', 'scripts', reload]);
