@@ -1,0 +1,90 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+
+<link rel="import" href="../../../bower_components/carbon-route/carbon-route.html">
+<link rel="import" href="../../../bower_components/carbon-route/carbon-location.html">
+
+<link rel="import" href="../../../bower_components/app-layout/app-layout.html">
+<link rel="import" href="../../../bower_components/font-roboto/roboto.html">
+
+<link rel="import" href="../../../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../../../bower_components/iron-pages/iron-pages.html">
+
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../../bower_components/paper-header-panel/paper-header-panel.html">
+<link rel="import" href="../../../bower_components/paper-drawer-panel/paper-drawer-panel.html">
+<link rel="import" href="../../../bower_components/paper-toolbar/paper-toolbar.html">
+<link rel="import" href="../../../bower_components/paper-material/paper-material.html">
+<link rel="import" href="../../../bower_components/paper-menu/paper-menu.html">
+<link rel="import" href="../../../bower_components/paper-item/paper-item.html">
+
+<link rel="import" href="../profile-button/profile-button.html">
+<link rel="import" href="../dialog-login/dialog-login.html">
+<link rel="import" href="../page-events/page-events.html">
+<link rel="import" href="../page-profile/page-profile.html">
+
+<dom-module id="events-app">
+  
+  <style is="custom-style">
+    app-header {
+      font-family: 'Roboto', 'Noto', sans-serif;
+      background-color: #1e88e5;
+      color: #fff;
+    }
+    body {
+      margin: 0;
+      font-family: 'Roboto', 'Noto', sans-serif;
+      background-color: #fafafa;
+    }
+    app-header paper-icon-button {
+      --paper-icon-button-ink-color: white;
+    }
+    @media (min-width: 801px) {
+      .narrow-only {
+        display: none !important;
+      }
+    }
+  </style>
+  <template>
+    <template is="dom-bind" id="app">
+      <carbon-location route={{route}}></carbon-location>
+      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}"></carbon-route>
+    
+      <app-drawer-layout force-narrow narrow>
+        <app-drawer id="startDrawer" align="start" >
+          <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
+            <paper-item data-url="events">Events</paper-item>
+            <paper-item data-url="profile">Profile</paper-item>
+          </paper-menu>
+        </app-drawer>
+        <app-header-layout>
+          <app-header fixed>
+            <app-toolbar>
+              <paper-icon-button icon="menu" class="narrow-only" drawer-toggle></paper-icon-button>
+              <div title>Event Planner</div>
+              <profile-button></profile-button>
+            </app-toolbar>
+          </app-header>
+          <iron-pages attr-for-selected="data-url" selected="{{data.page}}">
+            <page-events data-url="events"></page-events>
+            <page-profile data-url="profile"></page-profile>
+          </iron-pages>
+        </app-header-layout>
+      </app-drawer-layout>
+      <dialog-login></dialog-login>
+    </template>
+  </template>
+  <script>
+    Polymer({
+      is: 'events-app',
+      properties: {
+        route: {
+          type: Object
+        }
+      },
+      ready: function() {
+        document.getElementById('skeleton').remove();
+        Polymer.dom(this).removeAttribute('unresolved');
+      }
+    });
+  </script>
+</dom-module>

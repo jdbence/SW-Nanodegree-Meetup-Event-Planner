@@ -1,0 +1,116 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/firebase-element/firebase-collection.html">
+<link rel="import" href="../../../bower_components/paper-card/paper-card.html">
+<link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../../../bower_components/app-layout/app-layout.html">
+<link rel="import" href="../dialog-event/dialog-event.html">
+
+<dom-module id="page-events">
+  <style is="custom-style">
+    h3 {
+      text-align: center;
+    }
+    #container {
+      margin: 0 auto;
+      height: 300px;
+      width: 300px;
+      overflow: hidden;
+      background-color: #eee;
+    }
+    app-drawer#calendarDrawer{
+      --app-drawer-width: auto;
+      margin-top: 64px;
+    }
+    .card-row {
+      text-align: center;
+      padding: 10px;
+    }
+    paper-card {
+      width: 100%;
+    }
+    .fab-event {
+      margin: 20px;
+      position: fixed;
+      bottom: 0;
+      right: 0;
+    }
+    
+    @media (min-width: 640px) {
+      .fab-event {
+        right: 300px;
+      }
+    }
+  </style>
+  
+  <template>
+    <app-drawer-layout>
+      <app-drawer id="calendarDrawer" align="end">
+        <section>
+          <div id="container" on-track="track">
+            <paper-calendar id="picker" date="{{date}}"></paper-calendar>
+            {{date}}
+          </div>
+        </section>
+      </app-drawer>
+      <app-header-layout>
+        <firebase-collection
+          order-by-child="start"
+          limit-to-first="30"
+          location="https://u-swd-p1.firebaseio.com/events/google:106848061966232824657/list"
+          data="{{events}}"
+          id="eventCollection">
+        </firebase-collection>
+        <template is="dom-repeat" items="[[events]]" as="event">
+          <div class="card-row">
+            <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
+              <div class="card-content">
+                 <span>[[event.start]]</span>
+              </div>
+              <div class="card-actions">
+                <paper-button>Share</paper-button>
+                <paper-button>Explore!</paper-button>
+              </div>
+            </paper-card>
+          </div>
+        </template>
+        <paper-fab noink icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
+      </app-header-layout>
+    </app-drawer-layout>
+    <dialog-event ></dialog-event>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'page-events',
+      listeners: {
+        'create': 'handleCreateEvent'
+      },
+      
+      /**
+       * Open a dialog using the current target or it's parent 'data-dialog' attribute
+       *
+       */
+      handleOpenDialog: function(e) {
+        var target = e.target.hasAttribute('data-dialog') ? e.target : e.target.parentElement;
+        var id = target.getAttribute('data-dialog');
+        var dialog = document.getElementById(id);
+        if (dialog) {
+          dialog.open();
+        }
+      },
+      
+      /**
+       * Creates an Event and stores it in the DB
+       *
+       */
+      handleCreateEvent: function(e) {
+        console.log('page-events.handleCreateEvent()', e.detail);
+        if(e.detail) {
+          // this.$.eventCollection.add(e.detail);
+        }
+      }
+    });
+  </script>
+</dom-module>

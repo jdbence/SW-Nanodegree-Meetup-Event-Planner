@@ -1,0 +1,100 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/firebase-element/firebase-auth.html">
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../../bower_components/iron-icons/social-icons.html">
+
+<dom-module id="profile-button">
+  <style is="custom-style">
+    .round {
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .loggedin {
+      padding: 0;
+    }
+    .loggedout {
+      background-color: blue;
+      color: white;
+    }
+  </style>
+  
+  <template>
+    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
+    <paper-icon-button on-tap="login"  hidden$="{{isLoggedIn(user, statusKnown)}}" icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
+    <paper-icon-button on-tap="logout" hidden$="{{!isLoggedIn(user, statusKnown)}}" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'profile-button',
+  
+      properties: {
+        params: {
+          type:Object,
+          value: {
+            scope: 'profile'
+          }
+        },
+        
+        provider: {
+          type: String,
+          value: 'anonymous'
+        },
+  
+        user: {
+          type: Object,
+          value: null
+        },
+  
+        statusKnown: {
+          type: Boolean
+        }
+      },
+      
+      /**
+       * Show login dialog
+       *
+       */
+      login: function() {
+        var dialog = document.getElementById('loginDialog');
+        if (dialog) {
+          dialog.open();
+        }
+      },
+      
+      /**
+       * Request logout
+       *
+       */
+      logout: function() {
+        this.async(function(){
+          this.$.firebaseLogin.logout();
+          this.provider = 'anonymous';
+        }, 1);
+      },
+      
+      /**
+       * Login was successfull so close the login dialog
+       *
+       */
+      loginHandler: function(e) {
+        var dialog = document.getElementById('loginDialog');
+        if (dialog) {
+          dialog.close();
+        }
+      },
+      
+      isLoggedIn: function(user, statusKnown) {
+        return user && statusKnown;
+      },
+      
+      profileImage: function(user) {
+        return user && user.google ? user.google.profileImageURL : '';
+      },
+      
+      profileName: function(user) {
+        return user && user.google ? user.google.displayName : '';
+      }
+    });
+  </script>
+</dom-module>

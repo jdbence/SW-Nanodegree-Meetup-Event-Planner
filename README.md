@@ -9,13 +9,20 @@ SPA allows users to create new meetup events
 [clone-ghwin]: github-windows://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
 [clone-ghmac]: github-mac://openRepo/https://github.com/jdbence/SW-Nanodegree-Meetup-Event-Planner
 [gulp]: http://gulpjs.com
-[browsersync]: https://www.browsersync.io/
+[browsersync]: https://www.browsersync.io
+[bower]: http://bower.io/
+[polymer]: https://www.polymer-project.org/1.0/
+[style-commit]: https://udacity.github.io/git-styleguide
+[style-js]: http://google.github.io/styleguide/javascriptguide.xml
 
 [Live Example][example]
 
 ## Includes
 
-[Gulp][gulp], [Browsersync][browsersync]
+[Gulp][gulp], [Bower][bower], [Browsersync][browsersync], [Polymer][polymer]
+
+## Collaboration
+[Udacity Commit Styleguide][style-commit], [ESLint Google Styleguide][style-js]
 
 ## Installation
 
@@ -27,15 +34,17 @@ SPA allows users to create new meetup events
 
 ```node
 //  Install local dependencies
-npm install
+npm install && bower install
 ```
 
 ### Gulp Tasks
 
 ```node
-//  Start live editing
+// Start live editing
 gulp live
-// Empties the dist folder
+// Build dist version
+gulp
+// Empties dist folder
 gulp clean
 ```
 
