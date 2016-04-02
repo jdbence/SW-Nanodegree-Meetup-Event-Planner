@@ -18649,7 +18649,36 @@ event and do your own custom submission:
   </defs>
 </svg>
 </iron-iconset-svg>
-<dom-module id="dialog-login" assetpath="dialog-login/">
+<dom-module id="button-google" assetpath="button-google/">
+  <style is="custom-style">
+    :host {
+      cursor: pointer;
+      position: relative;
+      color: #737373;
+      border: 1px solid #d9d9d9;
+      text-transform: none;
+      padding: 6px;
+    }
+  </style>
+  
+  <template>
+    <iron-icon icon="google:google"></iron-icon>
+    <span> [[label]]</span>
+    <paper-ripple></paper-ripple>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'button-google',
+      properties: {
+        label: {
+          type: String,
+          value: 'Sign In'
+        }
+      }
+    });
+  </script>
+</dom-module><dom-module id="dialog-login" assetpath="dialog-login/">
   <style is="custom-style" include="iron-flex iron-flex-alignment">
     iron-collapse {
       margin: 0;
@@ -18735,13 +18764,10 @@ event and do your own custom submission:
           <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
           <paper-button on-tap="submitForm" class="simple login" id="loginSubmit">Sign In</paper-button>
-          <paper-button class="link">Create account?</paper-button>
+          <paper-button on-tap="createAccount" class="link">Create account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
-          <paper-button on-tap="loginGoogle" class="simple">
-            <iron-icon icon="google:google"></iron-icon>
-            <span> Sign In</span>
-          </paper-button>
+          <button-google on-tap="loginGoogle"></button-google>
         </paper-material>
       </div>
     </paper-dialog>
@@ -18780,7 +18806,7 @@ event and do your own custom submission:
       
       listeners: {
         'iron-overlay-closed': 'onDialogClosed',
-        'iron-form-submit': 'onFormSubmit',
+        'iron-form-presubmit': 'onFormSubmit',
         'iron-form-invalid': 'onInputChange'
       },
       
@@ -18793,6 +18819,7 @@ event and do your own custom submission:
        *
        */
       onFormSubmit: function (e) {
+        e.preventDefault();
         this.provider = 'password';
         this.$.firebaseLogin.login(e.detail);
       },
@@ -18845,6 +18872,19 @@ event and do your own custom submission:
       errorHandler: function(e) {
         this.message = e.detail.message;
         this.$.collapse.show();
+      },
+      
+      /**
+       * Open the registration dialog
+       *
+       */
+      createAccount: function() {
+        this.$.loginDialog.close();
+        
+        var dialog = document.getElementById('registerDialog');
+        if (dialog) {
+          dialog.open();
+        }
       }
     });
   </script>
@@ -24172,6 +24212,217 @@ event and do your own custom submission:
       }
     });
   </script>
+</dom-module><dom-module id="dialog-register" assetpath="dialog-register/">
+  <style is="custom-style" include="iron-flex iron-flex-alignment">
+    iron-collapse {
+      margin: 0;
+    }
+    
+    .collapse-content {
+      padding: 15px;
+      background-color: #FCDEDE;
+      border: 1px solid #D2B2B2;
+      color: #911;
+    }
+    
+    paper-dialog {
+      max-width: 100%;
+      width: 500px;
+    }
+    
+    paper-toolbar.pop {
+      --paper-toolbar-color: black;
+      --paper-toolbar-background: transparent;
+      --paper-toolbar-title: {
+        margin: 0 !important;
+      };
+      margin: 0;
+      padding: 0;
+    }
+    
+    paper-button.register {
+      margin: 10px 0;
+      display: block;
+    }
+    
+    paper-button.simple {
+      color: #737373;
+      border: 1px solid #d9d9d9;
+      text-transform: none;
+      padding: 6px;
+    }
+    
+    .inner {
+      min-height: 300px;
+    }
+    
+    .flex-buttons {
+      @apply(--layout-horizontal);
+      @apply(--layout-center);
+      @apply(--layout-center-justified);
+    }
+    
+    .link {
+      text-transform: none;
+    }
+    
+    .link:hover {
+      color: #ff4081;
+    }
+    
+    form {
+      @apply(--layout-flex-2);
+      padding: 1em;
+    }
+    
+    @media (max-width: 600px) {
+      form {
+        order: 1;
+        @apply(--layout-flex);
+      }
+    }
+  </style>
+  <template>
+    <firebase-auth id="firebaseRegister" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler" on-user-created="userCreatedHandler"></firebase-auth>
+    <paper-dialog id="registerDialog" modal="">
+      <paper-toolbar class="pop">
+        <span class="title">Account Register</span>
+        <paper-icon-button icon="close" title="close" dialog-dismiss=""></paper-icon-button>
+      </paper-toolbar>
+      <iron-collapse id="collapse">
+        <div class="collapse-content">{{message}}</div>
+      </iron-collapse>
+      <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
+      <div class$="{{computeLayout(mobile)}}">
+        <form is="iron-form" id="registerForm" action="/">
+          <paper-input name="name" label="Name" required="" auto-validate="" minlength="2" error-message="Atleast 2 characters"></paper-input>
+          <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
+          <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
+          <paper-button on-tap="submitForm" class="simple register" id="registerSubmit">Register</paper-button>
+          <paper-button class="link">Have account?</paper-button>
+        </form>
+        <paper-material elevation="1" class="flex flex-buttons">
+          <paper-button on-tap="registerGoogle" class="simple">
+            <iron-icon icon="google:google"></iron-icon>
+            <span> Connect</span>
+          </paper-button>
+        </paper-material>
+      </div>
+    </paper-dialog>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'dialog-register',
+      
+      properties: {
+        params: {
+          type:Object,
+          value: {
+            scope: 'profile'
+          }
+        },
+        
+        provider: {
+          type: String,
+          value: 'anonymous'
+        },
+  
+        user: {
+          type: Object,
+          value: null
+        },
+  
+        statusKnown: {
+          type: Boolean
+        },
+        
+        message: {
+          type: String
+        }
+      },
+      
+      listeners: {
+        'iron-overlay-closed': 'onDialogClosed',
+        'iron-form-presubmit': 'onFormSubmit',
+        'iron-form-invalid': 'onInputChange'
+      },
+      
+      ready: function(){
+        this.$.registerForm.addEventListener('change', this.onInputChange.bind(this));
+      },
+      
+      /**
+       * description
+       *
+       */
+      onFormSubmit: function (e) {
+        e.preventDefault();
+        var d = this.$.registerForm.serialize();
+        this.$.firebaseRegister.createUser(d.email, d.password);
+      },
+      
+      /**
+       * Disable register button when form is invalid
+       *
+       */
+      onInputChange: function () {
+        this.$.registerSubmit.disabled = !this.$.registerForm.validate();
+      },
+      
+      /**
+       * Returns the layout classes depending on mobile/desktop
+       *
+       */
+      computeLayout: function(mobile) {
+        return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Hide any error messages
+       *
+       */
+      onDialogClosed: function() {
+        this.$.collapse.hide();
+      },
+      
+      /**
+       * Request password login
+       *
+       */
+      submitForm: function(e) {
+        Polymer.dom(e).localTarget.parentElement.submit();
+      },
+      
+      /**
+       * Request Google SSO
+       *
+       */
+      registerGoogle: function(e) {
+        this.provider = 'google';
+        this.$.firebaseRegister.login();
+      },
+      
+      /**
+       * Something went wrong with the Firebase request
+       *
+       */
+      errorHandler: function(e) {
+        this.message = e.detail.message;
+        this.$.collapse.show();
+      },
+      
+      /**
+       * Login the user after the account is created
+       *
+       */
+      userCreatedHandler: function(e) {
+          console.log('userCreatedHandler', this.$.registerForm.serialize());
+        this.provider = 'password';
+        this.$.firebaseRegister.login(this.$.registerForm.serialize());
+      }
+    });
+  </script>
 </dom-module><script>
   /** @polymerBehavior */
   Polymer.FirebaseQueryBehavior = {
@@ -25750,6 +26001,7 @@ event and do your own custom submission:
         </app-header-layout>
       </app-drawer-layout>
       <dialog-login></dialog-login>
+      <dialog-register></dialog-register>
     </template>
   </template>
   <script>

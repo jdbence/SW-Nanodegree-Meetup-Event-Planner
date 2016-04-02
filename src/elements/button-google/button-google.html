@@ -1,0 +1,35 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../../bower_components/google-signin/google-icons.html">
+
+<dom-module id="button-google">
+  <style is="custom-style">
+    :host {
+      cursor: pointer;
+      position: relative;
+      color: #737373;
+      border: 1px solid #d9d9d9;
+      text-transform: none;
+      padding: 6px;
+    }
+  </style>
+  
+  <template>
+    <iron-icon icon="google:google"></iron-icon>
+    <span> [[label]]</span>
+    <paper-ripple></paper-ripple>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'button-google',
+      properties: {
+        label: {
+          type: String,
+          value: 'Sign In'
+        }
+      }
+    });
+  </script>
+</dom-module>
