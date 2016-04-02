@@ -20,8 +20,12 @@
   
   <template>
     <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
-    <paper-icon-button on-tap="login"  hidden$="{{isLoggedIn(user, statusKnown)}}" icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
-    <paper-icon-button on-tap="logout" hidden$="{{!isLoggedIn(user, statusKnown)}}" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+    <template is="dom-if" if="{{!isLoggedIn(user, statusKnown)}}">
+      <paper-icon-button on-tap="login"  icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
+    </template>
+    <template is="dom-if" if="{{isLoggedIn(user, statusKnown)}}">
+      <paper-icon-button on-tap="logout" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+    </template>
   </template>
   
   <script>
