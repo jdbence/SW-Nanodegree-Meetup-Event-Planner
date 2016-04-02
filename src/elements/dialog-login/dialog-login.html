@@ -1,21 +1,114 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/firebase-element/firebase-auth.html">
+<link rel="import" href="../../../bower_components/paper-material/paper-material.html">
 <link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
-<link rel="import" href="../../../bower_components/iron-icons/social-icons.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../../../bower_components/paper-toolbar/paper-toolbar.html">
+<link rel="import" href="../../../bower_components/iron-media-query/iron-media-query.html">
+<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../../../bower_components/iron-collapse/iron-collapse.html">
+<link rel="import" href="../../../bower_components/iron-form/iron-form.html">
+<link rel="import" href="../../../bower_components/gold-email-input/gold-email-input.html">
+<link rel="import" href="../../../bower_components/google-signin/google-icons.html">
 
 <dom-module id="dialog-login">
-  <style is="custom-style">
+  <style is="custom-style" include="iron-flex iron-flex-alignment">
+    iron-collapse {
+      margin: 0;
+    }
     
+    .collapse-content {
+      padding: 15px;
+      background-color: #FCDEDE;
+      border: 1px solid #D2B2B2;
+      color: #911;
+    }
+    
+    paper-dialog {
+      max-width: 100%;
+      width: 500px;
+    }
+    
+    paper-toolbar.pop {
+      --paper-toolbar-color: black;
+      --paper-toolbar-background: transparent;
+      --paper-toolbar-title: {
+        margin: 0 !important;
+      };
+      margin: 0;
+      padding: 0;
+    }
+    
+    paper-button.login {
+      margin: 10px 0;
+      display: block;
+    }
+    
+    paper-button.simple {
+      color: #737373;
+      border: 1px solid #d9d9d9;
+      text-transform: none;
+      padding: 6px;
+    }
+    
+    .inner {
+      min-height: 300px;
+    }
+    
+    .flex-buttons {
+      @apply(--layout-horizontal);
+      @apply(--layout-center);
+      @apply(--layout-center-justified);
+    }
+    
+    .link {
+      text-transform: none;
+    }
+    
+    .link:hover {
+      color: #ff4081;
+    }
+    
+    form {
+      @apply(--layout-flex-2);
+      padding: 1em;
+    }
+    
+    @media (max-width: 600px) {
+      form {
+        order: 1;
+        @apply(--layout-flex);
+      }
+    }
   </style>
   <template>
     <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler"></firebase-auth>
     <paper-dialog id="loginDialog" modal>
-      <h2>Login</h2>
-      <div>Dialog body</div>
-      <div class="buttons">
-        <paper-button dialog-dismiss>Cancel</paper-button>
-        <paper-button on-tap="loginGoogle">Google Login</paper-button>
+      <paper-toolbar class="pop">
+        <span class="title">Account Sign In</span>
+        <paper-icon-button icon="close" title="close" dialog-dismiss></paper-icon-button>
+      </paper-toolbar>
+      <iron-collapse id="collapse">
+        <div class="collapse-content">{{message}}</div>
+      </iron-collapse>
+      <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
+      <div class$="{{computeLayout(mobile)}}">
+        <form is="iron-form" id="loginForm" action="/">
+          <gold-email-input name="email" required auto-validate autofocus autocomplete error-message="Invalid Email"></gold-email-input>
+          <paper-input name="password" type="password" label="Password" required auto-validate minLength="5" error-message="Invalid Password"></paper-input>
+          <paper-button on-tap="submitForm" class="simple login" id="loginSubmit">Sign In</paper-button>
+          <paper-button class="link">Create account?</paper-button>
+        </form>
+        <paper-material elevation="1" class="flex flex-buttons">
+          <paper-button on-tap="loginGoogle" class="simple">
+            <iron-icon icon="google:google"></iron-icon>
+            <span> Sign In</span>
+          </paper-button>
+        </paper-material>
       </div>
     </paper-dialog>
   </template>
@@ -44,31 +137,80 @@
   
         statusKnown: {
           type: Boolean
+        },
+        
+        message: {
+          type: String
         }
+      },
+      
+      listeners: {
+        'iron-overlay-closed': 'onDialogClosed',
+        'iron-form-submit': 'onFormSubmit',
+        'iron-form-invalid': 'onInputChange'
+      },
+      
+      ready: function(){
+        this.$.loginForm.addEventListener('change', this.onInputChange.bind(this));
+      },
+      
+      /**
+       * description
+       *
+       */
+      onFormSubmit: function (e) {
+        this.provider = 'password';
+        this.$.firebaseLogin.login(e.detail);
+      },
+      
+      /**
+       * Disable login form's submit button when form is invalid
+       *
+       */
+      onInputChange: function () {
+        this.$.loginSubmit.disabled = !this.$.loginForm.validate();
+      },
+      
+      /**
+       * Returns the layout classes depending on mobile/desktop
+       *
+       */
+      computeLayout: function(mobile) {
+        return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Hide any error messages
+       *
+       */
+      onDialogClosed: function() {
+        this.$.collapse.hide();
       },
       
       /**
        * Request password login
        *
        */
-      login: function() {
-        console.log('login with password');
-        //this.provider = 'password';
-        //this.$.firebaseLogin.login();
+      submitForm: function(e) {
+        Polymer.dom(e).localTarget.parentElement.submit();
       },
       
       /**
        * Request Google SSO
        *
        */
-      loginGoogle: function() {
-        console.log('loginGoogle');
+      loginGoogle: function(e) {
         this.provider = 'google';
         this.$.firebaseLogin.login();
       },
-  
+      
+      /**
+       * Something went wrong with the Firebase request
+       *
+       */
       errorHandler: function(e) {
-        // 'Error: ' + e.detail.message;
+        this.message = e.detail.message;
+        this.$.collapse.show();
       }
     });
   </script>
