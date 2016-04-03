@@ -9,6 +9,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 --><!--
 @license
 Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE
+The complete set of authors may be found at http://polymer.github.io/AUTHORS
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS
+--><!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
 The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
@@ -18496,6 +18504,164 @@ event and do your own custom submission:
   });
 
 </script>
+<script>
+
+/*
+`iron-a11y-keys` provides a cross-browser interface for processing 
+keyboard commands. The interface adheres to [WAI-ARIA best 
+practices](http://www.w3.org/TR/wai-aria-practices/#kbd_general_binding). 
+It uses an expressive syntax to filter key presses.
+
+## Basic usage
+
+The sample code below is a portion of a custom element. The goal is to call
+the `onEnter` method whenever the `paper-input` element is in focus and 
+the `Enter` key is pressed.
+
+    <iron-a11y-keys id="a11y" target="[[target]]" keys="enter"
+                        on-keys-pressed="onEnter"></iron-a11y-keys>
+    <paper-input id="input"
+                 placeholder="Type something. Press enter. Check console."
+                 value="{{userInput::input}}"></paper-input>
+
+The custom element declares an `iron-a11y-keys` element that is bound to a 
+property called `target`. The `target` property
+needs to evaluate to the `paper-input` node. `iron-a11y-keys` registers 
+an event handler for the target node using Polymer's [annotated event handler
+syntax](https://www.polymer-project.org/1.0/docs/devguide/events.html#annotated-listeners). `{{userInput::input}}` sets the `userInput` property to the 
+user's input on each keystroke. 
+
+The last step is to link the two elements within the custom element's 
+registration.
+
+    ...
+    properties: {
+      userInput: {
+        type: String,
+        notify: true,
+      },
+      target: {
+        type: Object,
+        value: function() {
+          return this.$.input;
+        }
+      },
+    },
+    onEnter: function() {
+      console.log(this.userInput);
+    }
+    ...
+
+## The `keys` attribute
+
+The `keys` attribute expresses what combination of keys triggers the event.
+
+The attribute accepts a space-separated, plus-sign-concatenated 
+set of modifier keys and some common keyboard keys.
+
+The common keys are: `a-z`, `0-9` (top row and number pad), `*` (shift 8 and 
+number pad), `F1-F12`, `Page Up`, `Page Down`, `Left Arrow`, `Right Arrow`,
+`Down Arrow`, `Up Arrow`, `Home`, `End`, `Escape`, `Space`, `Tab`, `Enter`.
+
+The modifier keys are: `Shift`, `Control`, `Alt`.
+
+All keys are expected to be lowercase and shortened. E.g.
+`Left Arrow` is `left`, `Page Down` is `pagedown`, `Control` is `ctrl`, 
+`F1` is `f1`, `Escape` is `esc`, etc.
+
+### Grammar
+
+Below is the [EBNF](http://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form) 
+Grammar of the `keys` attribute.
+
+    modifier = "shift" | "ctrl" | "alt";
+    ascii = ? /[a-z0-9]/ ? ;
+    fnkey = ? f1 through f12 ? ;
+    arrow = "up" | "down" | "left" | "right" ;
+    key = "tab" | "esc" | "space" | "*" | "pageup" | "pagedown" | 
+          "home" | "end" | arrow | ascii | fnkey;
+    keycombo = { modifier, "+" }, key ;
+    keys = keycombo, { " ", keycombo } ;
+
+### Example
+
+Given the following value for `keys`: 
+
+`ctrl+shift+f7 up pagedown esc space alt+m`
+
+The event is fired if any of the following key combinations are fired: 
+`Control` and `Shift` and `F7` keys, `Up Arrow` key, `Page Down` key, 
+`Escape` key, `Space` key, `Alt` and `M` keys.
+
+### WAI-ARIA Slider Example
+
+The following is an example of the set of keys that fulfills WAI-ARIA's 
+"slider" role [best
+practices](http://www.w3.org/TR/wai-aria-practices/#slider):
+
+    <iron-a11y-keys target="[[target]]" keys="left pagedown down" 
+                    on-keys-pressed="decrement"></iron-a11y-keys>
+    <iron-a11y-keys target=""[[target]] keys="right pageup up" 
+                    on-keys-pressed="increment"></iron-a11y-keys>
+    <iron-a11y-keys target="[[target]]" keys="home" 
+                    on-keys-pressed="setMin"></iron-a11y-keys>
+    <iron-a11y-keys target=""[[target]] keys="end" 
+                    on-keys-pressed="setMax"></iron-a11y-keys>
+
+The `target` properties must evaluate to a node. See the basic usage 
+example above.
+
+Each of the values for the `on-keys-pressed` attributes must evalute
+to methods. The `increment` method should move the slider a set amount 
+toward the maximum value. `decrement` should move the slider a set amount 
+toward the minimum value. `setMin` should move the slider to the minimum 
+value. `setMax` should move the slider to the maximum value.
+
+@demo demo/index.html
+*/
+
+
+  Polymer({
+    is: 'iron-a11y-keys',
+
+    behaviors: [
+      Polymer.IronA11yKeysBehavior
+    ],
+
+    properties: {
+      /** @type {?Node} */
+      target: {
+        type: Object,
+        observer: '_targetChanged'
+      },
+
+      keys: {
+        type: String,
+        reflectToAttribute: true,
+        observer: '_keysChanged'
+      }
+    },
+
+    attached: function() {
+      if (!this.target) {
+        this.target = this.parentNode;
+      }
+    },
+
+    _targetChanged: function(target) {
+      this.keyEventTarget = target;
+    },
+
+    _keysChanged: function() {
+      this.removeOwnKeyBindings();
+      this.addOwnKeyBinding(this.keys, '_fireKeysPressed');
+    },
+
+    _fireKeysPressed: function(event) {
+      this.fire('keys-pressed', event.detail, {});
+    }
+  });
+</script>
 
 
 <dom-module id="gold-email-input" assetpath="../../bower_components/gold-email-input/">
@@ -18658,6 +18824,7 @@ event and do your own custom submission:
       border: 1px solid #d9d9d9;
       text-transform: none;
       padding: 6px;
+      background-color: white;
     }
   </style>
   
@@ -18693,7 +18860,7 @@ event and do your own custom submission:
     
     paper-dialog {
       max-width: 100%;
-      width: 500px;
+      width: 600px;
     }
     
     paper-toolbar.pop {
@@ -18712,17 +18879,23 @@ event and do your own custom submission:
     }
     
     paper-button.simple {
-      color: #737373;
       border: 1px solid #d9d9d9;
       text-transform: none;
       padding: 6px;
     }
     
+    paper-button.simple:not([disabled]) {
+      color: #737373;
+      background-color: white;
+    }
+    
     .inner {
       min-height: 300px;
+      margin-top: 0;
     }
     
     .flex-buttons {
+      @apply(--layout-flex-2);
       @apply(--layout-horizontal);
       @apply(--layout-center);
       @apply(--layout-center-justified);
@@ -18739,12 +18912,35 @@ event and do your own custom submission:
     form {
       @apply(--layout-flex-2);
       padding: 1em;
+      background-color: #f9f9f9;
+      position: relative;
+    }
+    
+    form:after {
+      content: "With Email";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
+    }
+    
+    paper-material:after {
+      content: "or Network";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
     }
     
     @media (max-width: 600px) {
-      form {
-        order: 1;
-        @apply(--layout-flex);
+      paper-dialog {
+        height: 100%;
+        margin: 0;
+      }
+      paper-material {
+        min-height: 100px;
       }
     }
   </style>
@@ -18760,10 +18956,11 @@ event and do your own custom submission:
       </iron-collapse>
       <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
       <div class$="{{computeLayout(mobile)}}">
+        <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="loginPassword"></iron-a11y-keys>
         <form is="iron-form" id="loginForm" action="/">
           <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
-          <paper-button on-tap="submitForm" class="simple login" id="loginSubmit">Sign In</paper-button>
+          <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
           <paper-button on-tap="createAccount" class="link">Create account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
@@ -18801,27 +18998,23 @@ event and do your own custom submission:
         
         message: {
           type: String
+        },
+        
+        form: {
+          type: Object,
+          value: function() {
+            return this.$.loginForm;
+          }
         }
       },
       
       listeners: {
         'iron-overlay-closed': 'onDialogClosed',
-        'iron-form-presubmit': 'onFormSubmit',
         'iron-form-invalid': 'onInputChange'
       },
       
       ready: function(){
         this.$.loginForm.addEventListener('change', this.onInputChange.bind(this));
-      },
-      
-      /**
-       * description
-       *
-       */
-      onFormSubmit: function (e) {
-        e.preventDefault();
-        this.provider = 'password';
-        this.$.firebaseLogin.login(e.detail);
       },
       
       /**
@@ -18837,7 +19030,7 @@ event and do your own custom submission:
        *
        */
       computeLayout: function(mobile) {
-        return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+        return 'layout inner ' + (mobile ? '' : 'horizontal');
       },
       
       /**
@@ -18852,8 +19045,9 @@ event and do your own custom submission:
        * Request password login
        *
        */
-      submitForm: function(e) {
-        Polymer.dom(e).localTarget.parentElement.submit();
+      loginPassword: function() {
+        this.provider = 'password';
+        this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
       
       /**
@@ -24227,7 +24421,7 @@ event and do your own custom submission:
     
     paper-dialog {
       max-width: 100%;
-      width: 500px;
+      width: 600px;
     }
     
     paper-toolbar.pop {
@@ -24246,17 +24440,23 @@ event and do your own custom submission:
     }
     
     paper-button.simple {
-      color: #737373;
       border: 1px solid #d9d9d9;
       text-transform: none;
       padding: 6px;
     }
     
+    paper-button.simple:not([disabled]) {
+      color: #737373;
+      background-color: white;
+    }
+    
     .inner {
       min-height: 300px;
+      margin-top: 0;
     }
     
     .flex-buttons {
+      @apply(--layout-flex-2);
       @apply(--layout-horizontal);
       @apply(--layout-center);
       @apply(--layout-center-justified);
@@ -24273,12 +24473,35 @@ event and do your own custom submission:
     form {
       @apply(--layout-flex-2);
       padding: 1em;
+      background-color: #f9f9f9;
+      position: relative;
+    }
+    
+    form:after {
+      content: "With Email";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
+    }
+    
+    paper-material:after {
+      content: "or Network";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
     }
     
     @media (max-width: 600px) {
-      form {
-        order: 1;
-        @apply(--layout-flex);
+      paper-dialog {
+        height: 100%;
+        margin: 0;
+      }
+      paper-material {
+        min-height: 100px;
       }
     }
   </style>
@@ -24294,12 +24517,13 @@ event and do your own custom submission:
       </iron-collapse>
       <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
       <div class$="{{computeLayout(mobile)}}">
+        <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="createUser"></iron-a11y-keys>
         <form is="iron-form" id="registerForm" action="/">
-          <paper-input name="name" label="Name" required="" auto-validate="" minlength="2" error-message="Atleast 2 characters"></paper-input>
-          <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
+          <paper-input name="name" label="Name" required="" auto-validate="" autofocus="" minlength="2" error-message="Atleast 2 characters"></paper-input>
+          <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
-          <paper-button on-tap="submitForm" class="simple register" id="registerSubmit">Register</paper-button>
-          <paper-button class="link">Have account?</paper-button>
+          <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
+          <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
           <paper-button on-tap="registerGoogle" class="simple">
@@ -24344,22 +24568,11 @@ event and do your own custom submission:
       
       listeners: {
         'iron-overlay-closed': 'onDialogClosed',
-        'iron-form-presubmit': 'onFormSubmit',
         'iron-form-invalid': 'onInputChange'
       },
       
       ready: function(){
         this.$.registerForm.addEventListener('change', this.onInputChange.bind(this));
-      },
-      
-      /**
-       * description
-       *
-       */
-      onFormSubmit: function (e) {
-        e.preventDefault();
-        var d = this.$.registerForm.serialize();
-        this.$.firebaseRegister.createUser(d.email, d.password);
       },
       
       /**
@@ -24387,14 +24600,6 @@ event and do your own custom submission:
       },
       
       /**
-       * Request password login
-       *
-       */
-      submitForm: function(e) {
-        Polymer.dom(e).localTarget.parentElement.submit();
-      },
-      
-      /**
        * Request Google SSO
        *
        */
@@ -24413,13 +24618,34 @@ event and do your own custom submission:
       },
       
       /**
+       * Request to create a user
+       *
+       */
+      createUser: function () {
+        var d = this.$.registerForm.serialize();
+        this.$.firebaseRegister.createUser(d.email, d.password);
+      },
+      
+      /**
        * Login the user after the account is created
        *
        */
       userCreatedHandler: function(e) {
-          console.log('userCreatedHandler', this.$.registerForm.serialize());
         this.provider = 'password';
         this.$.firebaseRegister.login(this.$.registerForm.serialize());
+        this.$.registerDialog.close();
+      },
+      
+      /**
+       * Open the login dialog
+       *
+       */
+      accountLogin: function() {
+        this.$.registerDialog.close();
+        var dialog = document.getElementById('loginDialog');
+        if (dialog) {
+          dialog.open();
+        }
       }
     });
   </script>
@@ -25956,10 +26182,10 @@ event and do your own custom submission:
 </dom-module><dom-module id="events-app" assetpath="events-app/">
   
   <style is="custom-style">
-    html, body {
-      margin: 0;
-      font-family: 'Roboto', 'Noto', sans-serif;
-      background-color: #fafafa;
+    :host {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
     app-header {
       background-color: #1e88e5;
@@ -25968,6 +26194,7 @@ event and do your own custom submission:
     app-header paper-icon-button {
       --paper-icon-button-ink-color: white;
     }
+    
     @media (min-width: 801px) {
       .narrow-only {
         display: none !important;
@@ -26000,9 +26227,9 @@ event and do your own custom submission:
           </iron-pages>
         </app-header-layout>
       </app-drawer-layout>
-      <dialog-login></dialog-login>
-      <dialog-register></dialog-register>
     </template>
+    <dialog-login></dialog-login>
+    <dialog-register></dialog-register>
   </template>
   <script>
     Polymer({

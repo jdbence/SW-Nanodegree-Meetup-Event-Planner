@@ -12,6 +12,7 @@
 <link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../../../bower_components/iron-collapse/iron-collapse.html">
 <link rel="import" href="../../../bower_components/iron-form/iron-form.html">
+<link rel="import" href="../../../bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="../../../bower_components/gold-email-input/gold-email-input.html">
 <link rel="import" href="../button-google/button-google.html">
 
@@ -30,7 +31,7 @@
     
     paper-dialog {
       max-width: 100%;
-      width: 500px;
+      width: 600px;
     }
     
     paper-toolbar.pop {
@@ -49,17 +50,23 @@
     }
     
     paper-button.simple {
-      color: #737373;
       border: 1px solid #d9d9d9;
       text-transform: none;
       padding: 6px;
     }
     
+    paper-button.simple:not([disabled]) {
+      color: #737373;
+      background-color: white;
+    }
+    
     .inner {
       min-height: 300px;
+      margin-top: 0;
     }
     
     .flex-buttons {
+      @apply(--layout-flex-2);
       @apply(--layout-horizontal);
       @apply(--layout-center);
       @apply(--layout-center-justified);
@@ -76,12 +83,35 @@
     form {
       @apply(--layout-flex-2);
       padding: 1em;
+      background-color: #f9f9f9;
+      position: relative;
+    }
+    
+    form:after {
+      content: "With Email";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
+    }
+    
+    paper-material:after {
+      content: "or Network";
+      position: absolute;
+      right: 0;
+      top: 0;
+      padding: 1em;
+      opacity: 0.3;
     }
     
     @media (max-width: 600px) {
-      form {
-        order: 1;
-        @apply(--layout-flex);
+      paper-dialog {
+        height: 100%;
+        margin: 0;
+      }
+      paper-material {
+        min-height: 100px;
       }
     }
   </style>
@@ -97,10 +127,11 @@
       </iron-collapse>
       <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
       <div class$="{{computeLayout(mobile)}}">
+        <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="loginPassword"></iron-a11y-keys>
         <form is="iron-form" id="loginForm" action="/">
           <gold-email-input name="email" required auto-validate autofocus autocomplete error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required auto-validate minLength="5" error-message="Invalid Password"></paper-input>
-          <paper-button on-tap="submitForm" class="simple login" id="loginSubmit">Sign In</paper-button>
+          <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
           <paper-button on-tap="createAccount" class="link">Create account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
@@ -138,27 +169,23 @@
         
         message: {
           type: String
+        },
+        
+        form: {
+          type: Object,
+          value: function() {
+            return this.$.loginForm;
+          }
         }
       },
       
       listeners: {
         'iron-overlay-closed': 'onDialogClosed',
-        'iron-form-presubmit': 'onFormSubmit',
         'iron-form-invalid': 'onInputChange'
       },
       
       ready: function(){
         this.$.loginForm.addEventListener('change', this.onInputChange.bind(this));
-      },
-      
-      /**
-       * description
-       *
-       */
-      onFormSubmit: function (e) {
-        e.preventDefault();
-        this.provider = 'password';
-        this.$.firebaseLogin.login(e.detail);
       },
       
       /**
@@ -174,7 +201,7 @@
        *
        */
       computeLayout: function(mobile) {
-        return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+        return 'layout inner ' + (mobile ? '' : 'horizontal');
       },
       
       /**
@@ -189,8 +216,9 @@
        * Request password login
        *
        */
-      submitForm: function(e) {
-        Polymer.dom(e).localTarget.parentElement.submit();
+      loginPassword: function() {
+        this.provider = 'password';
+        this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
       
       /**
