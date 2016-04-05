@@ -18961,7 +18961,7 @@ value. `setMax` should move the slider to the maximum value.
           <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
           <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
-          <paper-button on-tap="createAccount" class="link">Create account?</paper-button>
+          <paper-button on-tap="createAccount" class="link">Don't have an Account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
           <button-google on-tap="loginGoogle"></button-google>
@@ -19047,7 +19047,7 @@ value. `setMax` should move the slider to the maximum value.
        */
       loginPassword: function() {
         this.provider = 'password';
-        this.$.firebaseLogin.login(this.$.loginForm.serialize());
+        this.$.firebaseLogin.login(this.$.loginForm.serialize())
       },
       
       /**
@@ -24397,12 +24397,18 @@ value. `setMax` should move the slider to the maximum value.
         return user && statusKnown;
       },
       
+      userProvider: function (user) {
+        return user && user.provider && user[user.provider] ? user[user.provider] : {};
+      },
+      
       profileImage: function(user) {
-        return user && user.google ? user.google.profileImageURL : '';
+        var p = this.userProvider(user);
+        return p.profileImageURL ? p.profileImageURL : '';
       },
       
       profileName: function(user) {
-        return user && user.google ? user.google.displayName : '';
+        var p = this.userProvider(user);
+        return p.displayName ? p.displayName : '';
       }
     });
   </script>
