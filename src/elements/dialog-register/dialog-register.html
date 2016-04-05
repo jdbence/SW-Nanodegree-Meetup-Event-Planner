@@ -14,9 +14,9 @@
 <link rel="import" href="../../../bower_components/iron-form/iron-form.html">
 <link rel="import" href="../../../bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="../../../bower_components/gold-email-input/gold-email-input.html">
-<link rel="import" href="../button-google/button-google.html">
+<link rel="import" href="../../../bower_components/google-signin/google-icons.html">
 
-<dom-module id="dialog-login">
+<dom-module id="dialog-register">
   <style is="custom-style" include="iron-flex iron-flex-alignment">
     iron-collapse {
       margin: 0;
@@ -44,7 +44,7 @@
       padding: 0;
     }
     
-    paper-button.login {
+    paper-button.register {
       margin: 10px 0;
       display: block;
     }
@@ -116,10 +116,10 @@
     }
   </style>
   <template>
-    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler"></firebase-auth>
-    <paper-dialog id="loginDialog" modal>
+    <firebase-auth id="firebaseRegister" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler" on-user-created="userCreatedHandler"></firebase-auth>
+    <paper-dialog id="registerDialog" modal>
       <paper-toolbar class="pop">
-        <span class="title">Account Sign In</span>
+        <span class="title">Account Register</span>
         <paper-icon-button icon="close" title="close" dialog-dismiss></paper-icon-button>
       </paper-toolbar>
       <iron-collapse id="collapse">
@@ -127,15 +127,19 @@
       </iron-collapse>
       <iron-media-query query="(max-width: 600px)" query-matches="{{mobile}}"></iron-media-query>
       <div class$="{{computeLayout(mobile)}}">
-        <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="loginPassword"></iron-a11y-keys>
-        <form is="iron-form" id="loginForm" action="/">
-          <gold-email-input name="email" required auto-validate autofocus autocomplete error-message="Invalid Email"></gold-email-input>
+        <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="createUser"></iron-a11y-keys>
+        <form is="iron-form" id="registerForm" action="/">
+          <paper-input name="name" label="Name" required auto-validate autofocus minLength="2" error-message="Atleast 2 characters"></paper-input>
+          <gold-email-input name="email" required auto-validate autocomplete error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required auto-validate minLength="5" error-message="Invalid Password"></paper-input>
-          <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
-          <paper-button on-tap="createAccount" class="link">Don't have an Account?</paper-button>
+          <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
+          <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
         </form>
         <paper-material elevation="1" class="flex flex-buttons">
-          <button-google on-tap="loginGoogle"></button-google>
+          <paper-button on-tap="registerGoogle" class="simple">
+            <iron-icon icon="google:google"></iron-icon>
+            <span> Connect</span>
+          </paper-button>
         </paper-material>
       </div>
     </paper-dialog>
@@ -143,7 +147,7 @@
   
   <script>
     Polymer({
-      is: 'dialog-login',
+      is: 'dialog-register',
       
       properties: {
         params: {
@@ -169,13 +173,6 @@
         
         message: {
           type: String
-        },
-        
-        form: {
-          type: Object,
-          value: function() {
-            return this.$.loginForm;
-          }
         }
       },
       
@@ -185,15 +182,15 @@
       },
       
       ready: function(){
-        this.$.loginForm.addEventListener('change', this.onInputChange.bind(this));
+        this.$.registerForm.addEventListener('change', this.onInputChange.bind(this));
       },
       
       /**
-       * Disable login form's submit button when form is invalid
+       * Disable register button when form is invalid
        *
        */
       onInputChange: function () {
-        this.$.loginSubmit.disabled = !this.$.loginForm.validate();
+        this.$.registerSubmit.disabled = !this.$.registerForm.validate();
       },
       
       /**
@@ -201,7 +198,7 @@
        *
        */
       computeLayout: function(mobile) {
-        return 'layout inner ' + (mobile ? '' : 'horizontal');
+        return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
       },
       
       /**
@@ -213,21 +210,12 @@
       },
       
       /**
-       * Request password login
-       *
-       */
-      loginPassword: function() {
-        this.provider = 'password';
-        this.$.firebaseLogin.login(this.$.loginForm.serialize())
-      },
-      
-      /**
        * Request Google SSO
        *
        */
-      loginGoogle: function(e) {
+      registerGoogle: function(e) {
         this.provider = 'google';
-        this.$.firebaseLogin.login();
+        this.$.firebaseRegister.login();
       },
       
       /**
@@ -240,13 +228,31 @@
       },
       
       /**
-       * Open the registration dialog
+       * Request to create a user
        *
        */
-      createAccount: function() {
-        this.$.loginDialog.close();
-        
-        var dialog = document.getElementById('registerDialog');
+      createUser: function () {
+        var d = this.$.registerForm.serialize();
+        this.$.firebaseRegister.createUser(d.email, d.password);
+      },
+      
+      /**
+       * Login the user after the account is created
+       *
+       */
+      userCreatedHandler: function(e) {
+        this.provider = 'password';
+        this.$.firebaseRegister.login(this.$.registerForm.serialize());
+        this.$.registerDialog.close();
+      },
+      
+      /**
+       * Open the login dialog
+       *
+       */
+      accountLogin: function() {
+        this.$.registerDialog.close();
+        var dialog = document.getElementById('loginDialog');
         if (dialog) {
           dialog.open();
         }

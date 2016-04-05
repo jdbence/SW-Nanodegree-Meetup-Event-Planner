@@ -92,12 +92,18 @@
         return user && statusKnown;
       },
       
+      userProvider: function (user) {
+        return user && user.provider && user[user.provider] ? user[user.provider] : {};
+      },
+      
       profileImage: function(user) {
-        return user && user.google ? user.google.profileImageURL : '';
+        var p = this.userProvider(user);
+        return p.profileImageURL ? p.profileImageURL : '';
       },
       
       profileName: function(user) {
-        return user && user.google ? user.google.displayName : '';
+        var p = this.userProvider(user);
+        return p.displayName ? p.displayName : '';
       }
     });
   </script>
