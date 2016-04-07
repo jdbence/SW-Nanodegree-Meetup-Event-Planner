@@ -1,14 +1,54 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
+<link rel="import" href="../../../bower_components/iron-form/iron-form.html">
+<link rel="import" href="../../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../../bower_components/google-map/google-map.html">
+<link rel="import" href="../../../bower_components/google-map/google-map-search.html">
+<link rel="import" href="../lib/lodash.html">
 
 <dom-module id="dialog-event">
   <style is="custom-style">
     
   </style>
   <template>
+    <iron-ajax
+      auto
+      url="http://maps.googleapis.com/maps/api/geocode/json"
+      params='{"latlng":"37.5209389,-122.2734515"}'
+      handle-as="json"
+      on-response="handleGetStreetAddress"
+      debounce-duration="300">
+    </iron-ajax>
     <paper-dialog id="eventDialog" modal>
       <h2>Create Event</h2>
-      <div>Dialog body</div>
+      <div>
+        <form is="iron-form" id="eventForm" action="/">
+          <paper-input list="eventList" label="Type" required auto-validate error-message="Missing Type!"></paper-input>
+          <datalist id="eventList">
+            <option value="Birthday"></option>
+            <option value="Meeting"></option>
+            <option value="Hike"></option>
+            <option value="Hackathon"></option>
+          </datalist>
+          <paper-input label="Title" required auto-validate error-message="Missing Title!"></paper-input>
+          <paper-textarea label="Description (optional)"></paper-textarea>
+          <paper-input label="Host" required auto-validate error-message="Who's the host?"></paper-input>
+          <paper-input label="Location" required auto-validate error-message="Missing Location!"></paper-input>
+          <google-map map="{{map}}" latitude="37.779" longitude="-122.3892" zoom="13"></google-map>
+          <google-map-search map="[[map]]" query="Pizza" results="{{results}}"></google-map-search>
+          <paper-input list="guestList" label="Guest List" required auto-validate error-message="Who's attending?"></paper-input>
+          <datalist id="guestList">
+            <option value="Ashley"></option>
+            <option value="Jennifer"></option>
+            <option value="Tom"></option>
+            <option value="Phil"></option>
+            <option value="Mark"></option>
+            <option value="Allen"></option>
+          </datalist>
+        </form>
+      </div>
       <div class="buttons">
         <paper-button dialog-dismiss>Cancel</paper-button>
         <paper-button on-tap="handleCreate">Create</paper-button>
@@ -20,7 +60,12 @@
     Polymer({
       is: 'dialog-event',
       
+      ready: function() {
+        this.getLocation();
+      },
+      
       handleCreate: function() {
+        return;
         //TODO: check form validation before sending create event
         this.fire('create', {
           description: "another",
@@ -31,7 +76,29 @@
           title: "Next Meeting",
           type: "meeting"
         });
+      },
+      
+      getLocation() {
+        console.log(navigator, navigator.geolocation)
+        if (navigator && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(this.handleGetLocation);
+        }
+      },
+      
+      handleGetLocation(position) {
+        var point = position.coords;
+        console.log(point);
+      },
+      
+      handleGetStreetAddress(event) {
+        console.log('handleGetStreetAddress', event.detail.response.results)
+        var results = (event.detail && event.detail.response && event.detail.response.results) ? event.detail.response.results : [];
+        var matched = _.find(results, function(o) { return o.types.indexOf("street_address") >= 0 });
+        if(matched){
+          console.log(matched.formatted_address);
+        }
       }
+      
     });
   </script>
 </dom-module>

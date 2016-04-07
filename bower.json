@@ -10,12 +10,13 @@
     "app-layout": "PolymerLabs/app-layout#^0.0.14",
     "firebase-element": "git://github.com/GoogleWebComponents/firebase-element#^1.0.12",
     "carbon-route": "^0.8.0",
-    "font-roboto": "^0.0.2"
+    "font-roboto": "^0.0.2",
+    "gold-elements": "polymerelements/gold-elements#^1.0.1",
+    "google-map": "GoogleWebComponents/google-map#^1.1.10",
+    "google-signin": "GoogleWebComponents/google-signin#^1.3.2"
   },
   "devDependencies": {
-    "web-component-tester": "^4.0.0",
-    "gold-elements": "polymerelements/gold-elements#^1.0.1",
-    "google-signin": "GoogleWebComponents/google-signin#^1.3.2"
+    "web-component-tester": "^4.0.0"
   },
   "ignore": [],
   "resolutions": {
