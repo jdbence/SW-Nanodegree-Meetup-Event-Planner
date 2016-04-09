@@ -40488,7 +40488,10 @@ value. `setMax` should move the slider to the maximum value.
 }.call(this));
 </script><dom-module id="dialog-event" assetpath="dialog-event/">
   <style is="custom-style">
-    
+    paper-dialog {
+      max-width: 100%;
+      width: 600px;
+    }
   </style>
   <template>
     <iron-ajax auto="" url="http://maps.googleapis.com/maps/api/geocode/json" params="{&quot;latlng&quot;:&quot;37.5209389,-122.2734515&quot;}" handle-as="json" on-response="handleGetStreetAddress" debounce-duration="300">
@@ -40497,20 +40500,20 @@ value. `setMax` should move the slider to the maximum value.
       <h2>Create Event</h2>
       <div>
         <form is="iron-form" id="eventForm" action="/">
-          <paper-input list="eventList" label="Type" required="" auto-validate="" error-message="Missing Type!"></paper-input>
+          <paper-input name="type" list="eventList" label="Type" required="" auto-validate="" error-message="Missing Type!"></paper-input>
           <datalist id="eventList">
             <option value="Birthday"></option>
             <option value="Meeting"></option>
             <option value="Hike"></option>
             <option value="Hackathon"></option>
           </datalist>
-          <paper-input label="Title" required="" auto-validate="" error-message="Missing Title!"></paper-input>
-          <paper-textarea label="Description (optional)"></paper-textarea>
-          <paper-input label="Host" required="" auto-validate="" error-message="Who's the host?"></paper-input>
-          <paper-input label="Location" required="" auto-validate="" error-message="Missing Location!"></paper-input>
+          <paper-input name="title" label="Title" required="" auto-validate="" error-message="Missing Title!"></paper-input>
+          <paper-textarea name="description" label="Description (optional)"></paper-textarea>
+          <paper-input name="host" label="Host" required="" auto-validate="" error-message="Who's the host?"></paper-input>
+          <paper-input lname="location" abel="Location" required="" auto-validate="" error-message="Missing Location!"></paper-input>
           <google-map map="{{map}}" latitude="37.779" longitude="-122.3892" zoom="13"></google-map>
           <google-map-search map="[[map]]" query="Pizza" results="{{results}}"></google-map-search>
-          <paper-input list="guestList" label="Guest List" required="" auto-validate="" error-message="Who's attending?"></paper-input>
+          <paper-input name="guests" list="guestList" label="Guest List" required="" auto-validate="" error-message="Who's attending?"></paper-input>
           <datalist id="guestList">
             <option value="Ashley"></option>
             <option value="Jennifer"></option>
@@ -40537,6 +40540,9 @@ value. `setMax` should move the slider to the maximum value.
       },
       
       handleCreate: function() {
+        var data = this.$.eventForm.serialize();
+        console.log(data);
+        
         return;
         //TODO: check form validation before sending create event
         this.fire('create', {
