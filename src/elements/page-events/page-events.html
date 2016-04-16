@@ -4,8 +4,8 @@
 <link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="../../../bower_components/paper-button/paper-button.html">
 <link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../../../bower_components/paper-date-picker/paper-date-picker.html">
 <link rel="import" href="../../../bower_components/app-layout/app-layout.html">
-<link rel="import" href="../dialog-event/dialog-event.html">
 
 <dom-module id="page-events">
   <style is="custom-style">
@@ -19,7 +19,14 @@
       overflow: hidden;
       background-color: #eee;
     }
-    app-drawer#calendarDrawer{
+    .calendar-container {
+      margin: 0 auto;
+      height: 300px;
+      width: 300px;
+      overflow: hidden;
+      background-color: #eee;
+    }
+    app-drawer{
       --app-drawer-width: auto;
       margin-top: 64px;
     }
@@ -45,23 +52,22 @@
   </style>
   
   <template>
+    <firebase-collection
+      order-by-child="start"
+      limit-to-first="30"
+      location="https://u-swd-p1.firebaseio.com/events/google:106848061966232824657/list"
+      data="{{events}}"
+      id="eventCollection">
+    </firebase-collection>
     <app-drawer-layout>
       <app-drawer id="calendarDrawer" align="end">
         <section>
-          <div id="container" on-track="track">
-            <paper-calendar id="picker" date="{{date}}"></paper-calendar>
-            {{date}}
+          <div class="calendar-container">
+            <paper-calendar id="calendar" date="{{date}}"></paper-calendar>
           </div>
         </section>
       </app-drawer>
       <app-header-layout>
-        <firebase-collection
-          order-by-child="start"
-          limit-to-first="30"
-          location="https://u-swd-p1.firebaseio.com/events/google:106848061966232824657/list"
-          data="{{events}}"
-          id="eventCollection">
-        </firebase-collection>
         <template is="dom-repeat" items="[[events]]" as="event">
           <div class="card-row">
             <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
@@ -78,14 +84,24 @@
         <paper-fab noink icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
-    <dialog-event ></dialog-event>
   </template>
-  
   <script>
     Polymer({
       is: 'page-events',
       listeners: {
         'create': 'handleCreateEvent'
+      },
+      properties: {
+        date: {
+          type: Date,
+          notify: true
+        }
+      },
+      
+      ready: function() {
+        this.async(function(){
+          window.dispatchEvent(new Event('resize'));
+        }, 1000);
       },
       
       /**
@@ -93,7 +109,7 @@
        *
        */
       handleOpenDialog: function(e) {
-        var target = e.target.hasAttribute('data-dialog') ? e.target : e.target.parentElement;
+        var target = e.currentTarget;
         var id = target.getAttribute('data-dialog');
         var dialog = document.getElementById(id);
         if (dialog) {

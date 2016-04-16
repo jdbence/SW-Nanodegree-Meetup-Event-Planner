@@ -1,60 +1,138 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="../../../bower_components/paper-button/paper-button.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-input.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
+<link rel="import" href="../../../bower_components/paper-card/paper-card.html">
+<link rel="import" href="../../../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../../../bower_components/paper-date-picker-item/paper-datetime-picker-item.html">
+<link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../../../bower_components/iron-form/iron-form.html">
 <link rel="import" href="../../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../../bower_components/iron-icons/maps-icons.html">
+<link rel="import" href="../../../bower_components/iron-label/iron-label.html">
 <link rel="import" href="../../../bower_components/google-map/google-map.html">
 <link rel="import" href="../../../bower_components/google-map/google-map-search.html">
 <link rel="import" href="../lib/lodash.html">
 
 <dom-module id="dialog-event">
-  <style is="custom-style">
+  
+  <style is="custom-style" include="iron-flex iron-flex-alignment">
     paper-dialog {
       max-width: 100%;
       width: 600px;
+      height: 600px;
+      overflow: inherit;
+      @apply(--layout-vertical);
+    }
+    
+    paper-dialog section {
+      width: 100%;
+      overflow-y: auto;
+      @apply(--layout-flex);
+    }
+    
+    paper-dialog, paper-dialog *:not(.paper-input) {
+      -moz-user-select: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    google-map {
+      margin-top: 20px;
+      height: 200px;
+    }
+    paper-input {
+      padding-bottom: 10px;
+    }
+    paper-card {
+      max-height: 250px;
+      overflow-y: auto;
+      position: absolute;
+      z-index: 100;
+      width: 100%;
+      left: 0;
+      top: 30px;
+    }
+    .elipsis {
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    @media (max-width: 600px) {
+      paper-dialog {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+    }
+    .map-container {
+      position:relative;
+    }
+    .map-container:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 1;
     }
   </style>
   <template>
     <iron-ajax
-      auto
+      id="ajax"
       url="http://maps.googleapis.com/maps/api/geocode/json"
-      params='{"latlng":"37.5209389,-122.2734515"}'
+      params='{{computeLatLng(latitude, longitude)}}'
       handle-as="json"
       on-response="handleGetStreetAddress"
       debounce-duration="300">
     </iron-ajax>
+    <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
     <paper-dialog id="eventDialog" modal>
-      <h2>Create Event</h2>
-      <div>
+      <section>
+        <h2>Create Event</h2>
         <form is="iron-form" id="eventForm" action="/">
-          <paper-input name="type" list="eventList" label="Type" required auto-validate error-message="Missing Type!"></paper-input>
+          <paper-input name="type" list="eventList" label="Type" required autoFocus auto-validate error-message="Missing Type!"></paper-input>
           <datalist id="eventList">
             <option value="Birthday"></option>
             <option value="Meeting"></option>
             <option value="Hike"></option>
             <option value="Hackathon"></option>
           </datalist>
-          <paper-input name="title" label="Title" required auto-validate error-message="Missing Title!"></paper-input>
-          <paper-textarea name="description" label="Description (optional)"></paper-textarea>
-          <paper-input name="host" label="Host" required auto-validate error-message="Who's the host?"></paper-input>
-          <paper-input lname="location" abel="Location" required auto-validate error-message="Missing Location!"></paper-input>
-          <google-map map="{{map}}" latitude="37.779" longitude="-122.3892" zoom="13"></google-map>
-          <google-map-search map="[[map]]" query="Pizza" results="{{results}}"></google-map-search>
-          <paper-input name="guests" list="guestList" label="Guest List" required auto-validate error-message="Who's attending?"></paper-input>
-          <datalist id="guestList">
-            <option value="Ashley"></option>
-            <option value="Jennifer"></option>
-            <option value="Tom"></option>
-            <option value="Phil"></option>
-            <option value="Mark"></option>
-            <option value="Allen"></option>
-          </datalist>
+          <iron-label>
+            <span>When</span>
+            <paper-datetime-picker-item icon="icons:today" date="{{today}}" default-time="09:00" iron-label-target></paper-datetime-picker-item>
+          </iron-label>
+          <paper-input name="location" value="{{location}}" label="Location" on-focus="handleLocationFocus" on-blur="handleLocationBlur" required auto-validate error-message="Missing Location!">
+            <iron-icon icon="search" prefix></iron-icon>
+            <paper-card hidden$="{{computeShowLocations(showLocations, location, results)}}" suffix>
+              <paper-listbox>
+                <template is="dom-repeat" items="{{results}}" as="option">
+                  <paper-item on-tap="handleLocationSelect" data-option$="{{option}}">
+                    <iron-icon icon="maps:place" prefix></iron-icon>
+                    <span class="elipsis">{{computeLocationName(option)}}</span>
+                  </paper-item>
+                </template>
+              </paper-listbox>
+            </paper-card>
+          </paper-input>
+          <div class="map-container">
+            <google-map map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
+              <template is="dom-repeat" items="{{results}}" as="marker">
+                <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
+                  <h2>{{marker.name}}</h2>
+                  <span>{{marker.formatted_address}}</span>
+                </google-map-marker>
+              </template>
+            </google-map>
+          </div>
         </form>
-      </div>
+      </section>
       <div class="buttons">
         <paper-button dialog-dismiss>Cancel</paper-button>
-        <paper-button on-tap="handleCreate">Create</paper-button>
+        <paper-button on-tap="handleCreate" id="createSubmit">Create</paper-button>
       </div>
     </paper-dialog>
   </template>
@@ -63,45 +141,150 @@
     Polymer({
       is: 'dialog-event',
       
-      ready: function() {
-        this.getLocation();
-      },
-      
-      handleCreate: function() {
-        var data = this.$.eventForm.serialize();
-        console.log(data);
-        
-        return;
-        //TODO: check form validation before sending create event
-        this.fire('create', {
-          description: "another",
-          end: "03/22/2016",
-          host: "google:106848061966232824657",
-          location: "Google Plex",
-          start: "03/22/2016",
-          title: "Next Meeting",
-          type: "meeting"
-        });
-      },
-      
-      getLocation() {
-        console.log(navigator, navigator.geolocation)
-        if (navigator && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(this.handleGetLocation);
+      properties: {
+        map: {
+          type: Object,
+          value: null
+        },
+        results: {
+          type: Array,
+          value: []
+        },
+        location: {
+          type: String,
+          value: ''
+        },
+        latitude: {
+          type: Number,
+          value: null
+        },
+        longitude: {
+          type: Number,
+          value: null
+        },
+        showLocations: {
+          type: Boolean,
+          value: false
+        },
+        form: {
+          type: Object,
+          value: function() {
+            return this.$.eventForm;
+          }
+        },
+        today: {
+          type: String,
+          value: new Date().getTime()//'April 1, 2015'//new Date().getTime()
         }
       },
       
-      handleGetLocation(position) {
-        var point = position.coords;
-        console.log(point);
+      listeners: {
+        'iron-overlay-opened': 'handleDialogOpen'
       },
       
-      handleGetStreetAddress(event) {
-        console.log('handleGetStreetAddress', event.detail.response.results)
+      ready: function(){
+        this.$.eventForm.addEventListener('input', this.onFormChange.bind(this));
+      },
+      
+      /**
+       * Disable login form's submit button when form is invalid
+       *
+       */
+      onFormChange: function () {
+        console.log('onFormChange', this.$.eventForm.validate());
+        this.$.createSubmit.disabled = !this.$.eventForm.validate();
+      },
+      
+      handleDialogOpen: function() {
+        this.getLocation();
+        this.onFormChange();
+      },
+      
+      computeLatLng: function (latitude, longitude) {
+        return {
+          "latlng": latitude + "," + longitude
+        };
+      },
+      
+      computeShowLocations: function(show, location, results) {
+        return !show || (show && results.length === 0) || (location === '');
+      },
+      
+      computeLocationName: function(option) {
+        if(option.formatted_address.indexOf(option.name) != -1) {
+          return option.formatted_address;
+        }
+        return option.name + ' - ' + option.formatted_address;
+      },
+      
+      handleLocationSelect: function(e) {
+        if(e.currentTarget.dataset.option){
+          var option = JSON.parse(e.currentTarget.dataset.option);
+          
+          // clear values so map will recenter on click
+          this.location = this.latitude = this.longitude = '';
+          
+          this.async(function() {
+            // set location via street address or business & street address
+            this.location = this.computeLocationName(option);
+            // focus on location with the map
+            this.latitude = option.latitude;
+            this.longitude = option.longitude;
+          });
+          
+          // hide list
+          this.showLocations = false;
+          this.cancelAsync(this.blurAsync);
+        }
+      },
+      
+      handleLocationFocus: function(e) {
+        this.showLocations = true;
+        this.cancelAsync(this.blurAsync);
+      },
+      
+      handleLocationBlur: function(e) {
+        this.blurAsync = this.async(function() {
+          this.showLocations = false;
+        }, 200);
+      },
+      
+      handleCreate: function() {
+        if(this.$.eventForm.validate()){
+          var data = this.$.eventForm.serialize();
+          var now = new Date().getTime()
+          console.log(data, today);
+          return;
+          this.fire('create', {
+            location: data.location,
+            type: data.type,
+            start: now,
+            end: now,
+            title: data.type,
+            description: "",
+            host: "",
+          });
+        }
+      },
+      
+      getLocation: function() {
+        if (navigator && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(this.handleGetLocation.bind(this));
+        }
+      },
+      
+      handleGetLocation: function(position) {
+        var point = position.coords;
+        this.latitude = point.latitude;
+        this.longitude = point.longitude;
+        this.$.ajax.generateRequest();
+      },
+      
+      handleGetStreetAddress: function(event) {
         var results = (event.detail && event.detail.response && event.detail.response.results) ? event.detail.response.results : [];
-        var matched = _.find(results, function(o) { return o.types.indexOf("street_address") >= 0 });
+        var matched = _.find(results, function(o) { return o.types.indexOf('street_address') >= 0 });
         if(matched){
-          console.log(matched.formatted_address);
+          this.location = matched.formatted_address;
         }
       }
       
