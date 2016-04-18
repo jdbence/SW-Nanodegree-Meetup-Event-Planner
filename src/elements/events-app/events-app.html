@@ -20,8 +20,8 @@
 <link rel="import" href="../profile-button/profile-button.html">
 <link rel="import" href="../dialog-login/dialog-login.html">
 <link rel="import" href="../dialog-register/dialog-register.html">
-<link rel="import" href="../dialog-event/dialog-event.html">
 <link rel="import" href="../page-events/page-events.html">
+<link rel="import" href="../page-event/page-event.html">
 <link rel="import" href="../page-profile/page-profile.html">
 
 <dom-module id="events-app">
@@ -49,7 +49,8 @@
   <template>
     <template is="dom-bind" id="app">
       <carbon-location route={{route}}></carbon-location>
-      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}"></carbon-route>
+      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
+      <carbon-route route="{{subroute}}" pattern="/:id" data="{{subrouteData}}"></carbon-route>
     
       <app-drawer-layout force-narrow narrow>
         <app-drawer id="startDrawer" align="start" >
@@ -66,7 +67,8 @@
               <profile-button></profile-button>
             </app-toolbar>
           </app-header>
-          <iron-pages attr-for-selected="data-url" selected="{{data.page}}">
+          <iron-pages attr-for-selected="data-url" selected="[[data.page]]">
+            <page-event data-url="event" id="[[subrouteData.id]]"></page-event>
             <page-events data-url="events"></page-events>
             <page-profile data-url="profile"></page-profile>
           </iron-pages>
@@ -75,7 +77,6 @@
     </template>
     <dialog-login></dialog-login>
     <dialog-register></dialog-register>
-    <dialog-event></dialog-event>
   </template>
   <script>
     Polymer({
@@ -83,7 +84,20 @@
       properties: {
         route: {
           type: Object
+        },
+        data: {
+          type: Object
+        },
+        pageURL: {
+          type: String,
+          computed: 'computeSelectedRoute(data)'
         }
+      },
+      computeSelectedRoute: function(page) {
+        // var data = this.properties.data;
+        // var subrouteData = this.properties.subrouteData;
+        console.log('sssssss', page);
+        return page ? page : 'events';
       },
       ready: function() {
         document.getElementById('skeleton').remove();

@@ -1,0 +1,25 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+
+<dom-module id="page-event">
+  <style is="custom-style">
+    h3 {
+      text-align: center;
+    }
+  </style>
+  
+  <template>
+    <h3>Event {{id}} Page</h3>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'page-event',
+      properties: {
+        id: {
+          type: String,
+          value: "?"
+        }
+      }
+    });
+  </script>
+</dom-module>

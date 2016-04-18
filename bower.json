@@ -15,7 +15,7 @@
     "google-map": "GoogleWebComponents/google-map#^1.1.10",
     "google-signin": "GoogleWebComponents/google-signin#^1.3.2",
     "paper-date-picker": "git@github.com:matfin/paper-date-picker.git#master",
-    "paper-time-picker": "git@github.com:jdbence/paper-time-picker.git#flex",
+    "paper-time-picker": "git@github.com:bendavis78/paper-time-picker.git#master",
     "paper-date-picker-item": "^1.0.26",
     "moment-element": "Collaborne/moment-element#fix/min-ref"
   },
@@ -27,6 +27,6 @@
     "font-roboto": "^1.0.1",
     "moment-element": "fix/min-ref",
     "paper-date-picker": "master",
-    "paper-time-picker": "flex"
+    "paper-time-picker": "master"
   }
 }
