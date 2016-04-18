@@ -75,6 +75,7 @@
           this.$.firebaseLogin.logout();
           this.provider = 'anonymous';
         }, 1);
+        this.fire('iron-signal', {name: 'logout', data:null});
       },
       
       /**
@@ -86,6 +87,7 @@
         if (dialog) {
           dialog.close();
         }
+        this.fire('iron-signal', {name: 'login-success', data: e.detail});
       },
       
       isLoggedIn: function(user, statusKnown) {

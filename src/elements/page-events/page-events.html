@@ -6,6 +6,8 @@
 <link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
 <link rel="import" href="../../../bower_components/paper-date-picker/paper-date-picker.html">
 <link rel="import" href="../../../bower_components/app-layout/app-layout.html">
+<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
 <link rel="import" href="../dialog-event/dialog-event.html">
 
 <dom-module id="page-events">
@@ -45,6 +47,30 @@
       right: 0;
     }
     
+    .no-events {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      -ms-flex-align: center;
+      align-items: center;
+      min-height: 24em;
+      -webkit-box-pack: center;
+      -webkit-justify-content: center;
+      -ms-flex-pack: center;
+      justify-content: center;
+    }
+    
+    .no-events-icon {
+      color: #E0E0E0;
+      width: 25%;
+      height: auto;
+      max-width: 200px;
+    }
+    
+    
     @media (min-width: 640px) {
       .fab-event {
         right: 300px;
@@ -69,24 +95,35 @@
         </section>
       </app-drawer>
       <app-header-layout>
-        <template is="dom-repeat" items="[[events]]" as="event">
-          <div class="card-row">
-            <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
-              <div class="card-content">
-                 <span>[[event.start]]</span>
-              </div>
-              <div class="card-actions">
-                <paper-button>Share</paper-button>
-                <paper-button>Explore!</paper-button>
-              </div>
-            </paper-card>
-          </div>
-        </template>
+        <section hidden$="{{hasNoEvents(events.*)}}">
+          <template is="dom-repeat" items="[[events]]" as="event">
+            <div class="card-row">
+              <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
+                <div class="card-content">
+                   <span>[[event.start]]</span>
+                </div>
+                <div class="card-actions">
+                  <paper-button>Share</paper-button>
+                  <a href$="/event/{{event.id}}" tabindex="-1">
+                    <paper-button>Explore!</paper-button>
+                  </a>
+                </div>
+              </paper-card>
+            </div>
+          </template>
+        </section>
+        <section hidden$="{{hasEvents(events.*)}}" class="no-events">
+          <iron-icon class="no-events-icon" icon="event"></iron-icon>
+          <h3>No events created</h3>
+        </section>
         <paper-fab noink icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
+    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
+    <dialog-event></dialog-event>
   </template>
-  <dialog-event></dialog-event>
+  
   <script>
     Polymer({
       is: 'page-events',
@@ -97,6 +134,10 @@
         date: {
           type: Date,
           notify: true
+        },
+        events: {
+          type: Array,
+          value: []
         },
         listLocation: {
           type:String,
@@ -110,9 +151,12 @@
         }, 1000);
       },
       
-      handleLogin: function() {
-        //listLocation = 
-        //https://u-swd-p1.firebaseio.com/events/google:106848061966232824657/list
+      handleLogin: function(event) {
+        this.listLocation = 'https://u-swd-p1.firebaseio.com/events/' + event.detail.user.uid + '/list';
+      },
+      
+      handleLogout: function(event) {
+        this.listLocation = '';
       },
       
       /**
@@ -122,7 +166,7 @@
       handleOpenDialog: function(e) {
         var target = e.currentTarget;
         var id = target.getAttribute('data-dialog');
-        var dialog = document.getElementById(id);
+        var dialog = document.getElementById(id);console.log(target, id, dialog)
         if (dialog) {
           dialog.open();
         }
@@ -137,7 +181,22 @@
         if(e.detail) {
           // this.$.eventCollection.add(e.detail);
         }
+      },
+      
+      /**
+       * Check if events have been created
+       */
+      hasEvents: function(events) {
+        return events.base.length > 0;
+      },
+      
+      /**
+       * Check if events have NOT been created
+       */
+      hasNoEvents: function(events) {
+        return events.base.length == 0;
       }
+      
     });
   </script>
 </dom-module>

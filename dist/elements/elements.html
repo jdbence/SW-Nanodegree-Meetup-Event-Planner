@@ -24548,6 +24548,7 @@ value. `setMax` should move the slider to the maximum value.
           this.$.firebaseLogin.logout();
           this.provider = 'anonymous';
         }, 1);
+        this.fire('iron-signal', {name: 'logout', data:null});
       },
       
       /**
@@ -24559,6 +24560,7 @@ value. `setMax` should move the slider to the maximum value.
         if (dialog) {
           dialog.close();
         }
+        this.fire('iron-signal', {name: 'login-success', data: e.detail});
       },
       
       isLoggedIn: function(user, statusKnown) {
@@ -29548,6 +29550,76 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
     });
   </script>
 </dom-module>
+<script>
+(function(){
+/**
+`iron-signals` provides basic publish-subscribe functionality.
+
+Note: avoid using `iron-signals` whenever you can use
+a controller (parent element) to mediate communication
+instead.
+
+To send a signal, fire a custom event of type `iron-signal`, with
+a detail object containing `name` and `data` fields.
+
+    this.fire('iron-signal', {name: 'hello', data: null});
+
+To receive a signal, listen for `iron-signal-<name>` event on a
+`iron-signals` element.
+
+  <iron-signals on-iron-signal-hello="{{helloSignal}}">
+
+You can fire a signal event from anywhere, and all
+`iron-signals` elements will receive the event, regardless
+of where they are in DOM.
+
+@demo demo/index.html
+*/
+  Polymer({
+    is: 'iron-signals',
+
+    attached: function() {
+      signals.push(this);
+    },
+    detached: function() {
+      var i = signals.indexOf(this);
+      if (i >= 0) {
+        signals.splice(i, 1);
+      }
+    }
+  });
+
+  // private shared database
+  var signals = [];
+
+  // signal dispatcher
+  function notify(name, data) {
+    // convert generic-signal event to named-signal event
+    var signal = new CustomEvent('iron-signal-' + name, {
+      // if signals bubble, it's easy to get confusing duplicates
+      // (1) listen on a container on behalf of local child
+      // (2) some deep child ignores the event and it bubbles
+      //     up to said container
+      // (3) local child event bubbles up to container
+      // also, for performance, we avoid signals flying up the
+      // tree from all over the place
+      bubbles: false,
+      detail: data
+    });
+    // dispatch named-signal to all 'signals' instances,
+    // only interested listeners will react
+    signals.forEach(function(s) {
+      s.dispatchEvent(signal);
+    });
+  }
+
+  // signal listener at document
+  document.addEventListener('iron-signal', function(e) {
+    notify(e.detail.name, e.detail.data);
+  });
+
+})();
+</script>
 
 
 <dom-module id="iron-autogrow-textarea" assetpath="../../bower_components/iron-autogrow-textarea/">
@@ -46080,6 +46152,30 @@ Polymer.PaperDatePickerItemBehavior = {
       right: 0;
     }
     
+    .no-events {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      -ms-flex-align: center;
+      align-items: center;
+      min-height: 24em;
+      -webkit-box-pack: center;
+      -webkit-justify-content: center;
+      -ms-flex-pack: center;
+      justify-content: center;
+    }
+    
+    .no-events-icon {
+      color: #E0E0E0;
+      width: 25%;
+      height: auto;
+      max-width: 200px;
+    }
+    
+    
     @media (min-width: 640px) {
       .fab-event {
         right: 300px;
@@ -46099,24 +46195,35 @@ Polymer.PaperDatePickerItemBehavior = {
         </section>
       </app-drawer>
       <app-header-layout>
-        <template is="dom-repeat" items="[[events]]" as="event">
-          <div class="card-row">
-            <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
-              <div class="card-content">
-                 <span>[[event.start]]</span>
-              </div>
-              <div class="card-actions">
-                <paper-button>Share</paper-button>
-                <paper-button>Explore!</paper-button>
-              </div>
-            </paper-card>
-          </div>
-        </template>
+        <section hidden$="{{hasNoEvents(events.*)}}">
+          <template is="dom-repeat" items="[[events]]" as="event">
+            <div class="card-row">
+              <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
+                <div class="card-content">
+                   <span>[[event.start]]</span>
+                </div>
+                <div class="card-actions">
+                  <paper-button>Share</paper-button>
+                  <a href$="/event/{{event.id}}" tabindex="-1">
+                    <paper-button>Explore!</paper-button>
+                  </a>
+                </div>
+              </paper-card>
+            </div>
+          </template>
+        </section>
+        <section hidden$="{{hasEvents(events.*)}}" class="no-events">
+          <iron-icon class="no-events-icon" icon="event"></iron-icon>
+          <h3>No events created</h3>
+        </section>
         <paper-fab noink="" icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
+    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
+    <dialog-event></dialog-event>
   </template>
-  <dialog-event></dialog-event>
+  
   <script>
     Polymer({
       is: 'page-events',
@@ -46127,6 +46234,10 @@ Polymer.PaperDatePickerItemBehavior = {
         date: {
           type: Date,
           notify: true
+        },
+        events: {
+          type: Array,
+          value: []
         },
         listLocation: {
           type:String,
@@ -46140,9 +46251,12 @@ Polymer.PaperDatePickerItemBehavior = {
         }, 1000);
       },
       
-      handleLogin: function() {
-        //listLocation = 
-        //https://u-swd-p1.firebaseio.com/events/google:106848061966232824657/list
+      handleLogin: function(event) {
+        this.listLocation = 'https://u-swd-p1.firebaseio.com/events/' + event.detail.user.uid + '/list';
+      },
+      
+      handleLogout: function(event) {
+        this.listLocation = '';
       },
       
       /**
@@ -46152,7 +46266,7 @@ Polymer.PaperDatePickerItemBehavior = {
       handleOpenDialog: function(e) {
         var target = e.currentTarget;
         var id = target.getAttribute('data-dialog');
-        var dialog = document.getElementById(id);
+        var dialog = document.getElementById(id);console.log(target, id, dialog)
         if (dialog) {
           dialog.open();
         }
@@ -46167,7 +46281,22 @@ Polymer.PaperDatePickerItemBehavior = {
         if(e.detail) {
           // this.$.eventCollection.add(e.detail);
         }
+      },
+      
+      /**
+       * Check if events have been created
+       */
+      hasEvents: function(events) {
+        return events.base.length > 0;
+      },
+      
+      /**
+       * Check if events have NOT been created
+       */
+      hasNoEvents: function(events) {
+        return events.base.length == 0;
       }
+      
     });
   </script>
 </dom-module><dom-module id="page-event" assetpath="page-event/">
@@ -46229,6 +46358,7 @@ Polymer.PaperDatePickerItemBehavior = {
         display: none !important;
       }
     }
+    
   </style>
   <template>
     <template is="dom-bind" id="app">
