@@ -101,10 +101,11 @@
             <option value="Hike"></option>
             <option value="Hackathon"></option>
           </datalist>
-          <iron-label>
+          <paper-input name="start_time" value="{{today}}" label="When" hidden></paper-input>
+          <div>
             <span>When</span>
-            <paper-datetime-picker-item icon="icons:today" date="{{today}}" default-time="09:00" iron-label-target></paper-datetime-picker-item>
-          </iron-label>
+            <paper-datetime-picker-item icon="icons:today" date="{{today}}" iron-label-target></paper-datetime-picker-item>
+          </div>
           <paper-input name="location" value="{{location}}" label="Location" on-focus="handleLocationFocus" on-blur="handleLocationBlur" required auto-validate error-message="Missing Location!">
             <iron-icon icon="search" prefix></iron-icon>
             <paper-card hidden$="{{computeShowLocations(showLocations, location, results)}}" suffix>
@@ -191,7 +192,6 @@
        *
        */
       onFormChange: function () {
-        console.log('onFormChange', this.$.eventForm.validate());
         this.$.createSubmit.disabled = !this.$.eventForm.validate();
       },
       
@@ -252,18 +252,25 @@
       handleCreate: function() {
         if(this.$.eventForm.validate()){
           var data = this.$.eventForm.serialize();
-          var now = new Date().getTime()
-          console.log(data, today);
-          return;
+          var time = new Date(data.start_time).getTime();
+          
+          // request to create the event
           this.fire('create', {
             location: data.location,
             type: data.type,
-            start: now,
-            end: now,
+            start: time,
+            end: time,
             title: data.type,
             description: "",
             host: "",
+            created: Firebase.ServerValue.TIMESTAMP
           });
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
         }
       },
       

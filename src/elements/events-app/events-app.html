@@ -88,17 +88,7 @@
         },
         data: {
           type: Object
-        },
-        pageURL: {
-          type: String,
-          computed: 'computeSelectedRoute(data)'
         }
-      },
-      computeSelectedRoute: function(page) {
-        // var data = this.properties.data;
-        // var subrouteData = this.properties.subrouteData;
-        console.log('sssssss', page);
-        return page ? page : 'events';
       },
       ready: function() {
         document.getElementById('skeleton').remove();

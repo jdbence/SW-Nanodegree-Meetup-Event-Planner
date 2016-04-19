@@ -8,7 +8,10 @@
 <link rel="import" href="../../../bower_components/app-layout/app-layout.html">
 <link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
 <link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
+<link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../../../bower_components/moment-element/moment-element.html">
 <link rel="import" href="../dialog-event/dialog-event.html">
+<link rel="import" href="../card-event/card-event.html">
 
 <dom-module id="page-events">
   <style is="custom-style">
@@ -33,10 +36,6 @@
       --app-drawer-width: auto;
       margin-top: 64px;
     }
-    .card-row {
-      text-align: center;
-      padding: 10px;
-    }
     paper-card {
       width: 100%;
     }
@@ -48,19 +47,10 @@
     }
     
     .no-events {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: -ms-flexbox;
-      display: flex;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      -ms-flex-align: center;
-      align-items: center;
+      @apply(--layout-vertical);
+      @apply(--layout-center);
+      @apply(--layout-center-justified);
       min-height: 24em;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      -ms-flex-pack: center;
-      justify-content: center;
     }
     
     .no-events-icon {
@@ -96,19 +86,9 @@
       </app-drawer>
       <app-header-layout>
         <section hidden$="{{hasNoEvents(events.*)}}">
-          <template is="dom-repeat" items="[[events]]" as="event">
+          <template id="resultList" is="dom-repeat" items="{{events}}" as="event" index-as="eventId" filter="{{filterByDate(date)}}" sort="sortByDate">
             <div class="card-row">
-              <paper-card heading="[[event.title]]" data-key="[[event.__firebaseKey__]]">
-                <div class="card-content">
-                   <span>[[event.start]]</span>
-                </div>
-                <div class="card-actions">
-                  <paper-button>Share</paper-button>
-                  <a href$="/event/{{event.id}}" tabindex="-1">
-                    <paper-button>Explore!</paper-button>
-                  </a>
-                </div>
-              </paper-card>
+              <card-event event="{{event}}" key="[[event.__firebaseKey__]]"></card-event>
             </div>
           </template>
         </section>
@@ -132,8 +112,7 @@
       },
       properties: {
         date: {
-          type: Date,
-          notify: true
+          type: Date
         },
         events: {
           type: Array,
@@ -151,6 +130,16 @@
         }, 1000);
       },
       
+      filterByDate: function (date) {
+        return function (item) {
+          return date <= item.start;
+        };
+      },
+      
+      sortByDate: function(a, b) {
+        return a.start === b.start ? 0 : a.start < b.start ? -1 : 1;
+      },
+      
       handleLogin: function(event) {
         this.listLocation = 'https://u-swd-p1.firebaseio.com/events/' + event.detail.user.uid + '/list';
       },
@@ -166,7 +155,7 @@
       handleOpenDialog: function(e) {
         var target = e.currentTarget;
         var id = target.getAttribute('data-dialog');
-        var dialog = document.getElementById(id);console.log(target, id, dialog)
+        var dialog = document.getElementById(id);
         if (dialog) {
           dialog.open();
         }
@@ -177,9 +166,8 @@
        *
        */
       handleCreateEvent: function(e) {
-        console.log('page-events.handleCreateEvent()', e.detail);
         if(e.detail) {
-          // this.$.eventCollection.add(e.detail);
+          this.$.eventCollection.add(e.detail);
         }
       },
       
