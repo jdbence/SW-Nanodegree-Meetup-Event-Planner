@@ -116,7 +116,7 @@
     }
   </style>
   <template>
-    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler"></firebase-auth>
+    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" redirect params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-error="errorHandler"></firebase-auth>
     <paper-dialog id="loginDialog" modal>
       <paper-toolbar class="pop">
         <span class="title">Account Sign In</span>
