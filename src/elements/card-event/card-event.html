@@ -1,0 +1,99 @@
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-card/paper-card.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../../../bower_components/moment-element/moment-element.html">
+
+<dom-module id="card-event">
+  <style is="custom-style">
+      paper-card {
+        @apply(--layout-vertical);
+        margin: 10px;
+      }
+      .event-date {
+        @apply(--layout-flex);
+        @apply(--layout-horizontal);
+        background-color: #1E88E5;
+        color: white;
+        text-align: left;
+      }
+      .event-content {
+        @apply(--layout-flex);
+        float: left;
+      }
+      .event-header {
+        @apply(--paper-font-headline);
+      }
+      .event-name {
+        color: var(--paper-grey-600);
+        margin: 10px 0;
+      }
+      
+      @media (max-width: 639px) {
+        .event-date {
+          @apply(--layout-center);
+          height: 30px;
+          -webkit-flex-basis: inherit;
+          flex-basis: inherit;
+        }
+        moment-element {
+          padding: 5px;
+        }
+      }
+      
+      @media (min-width: 640px) {
+        paper-card {
+          @apply(--layout-horizontal);
+        }
+        .event-date {
+          @apply(--layout-vertical);
+          @apply(--layout-center-justified);
+          text-align: center;
+        }
+        moment-element {
+          display: block;
+        }
+        .event-content {
+          @apply(--layout-flex-4);
+        }
+      }
+    </style>
+  
+  <template>
+    <paper-card>
+      <div class="event-date">
+        <moment-element datetime="{{event.start}}" output-format="h:mm A"></moment-element>
+        <moment-element datetime="{{event.start}}" output-format="MMM DD[,] YYYY"></moment-element>
+      </div>
+      <div class="event-content">
+        <div class="card-content">
+          <div class="event-header">{{event.title}}</div>
+          <div class="event-name">{{event.host}}</div>
+          <div>{{event.location}}</div>
+        </div>
+        <div class="card-actions">
+          <a href$="/event/[[key]]" tabindex="-1">
+            <paper-button>Details</paper-button>
+          </a>
+        </div>
+      </div>
+      
+    </paper-card>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'card-event',
+      properties: {
+        event: {
+          start: 0,
+          title: '',
+          host: '',
+          location: '',
+          token:''
+        },
+        key: ''
+      }
+    });
+  </script>
+</dom-module>

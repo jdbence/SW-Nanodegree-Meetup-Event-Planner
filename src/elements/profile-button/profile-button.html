@@ -6,24 +6,22 @@
 <dom-module id="profile-button">
   <style is="custom-style">
     .round {
+      background-color: blue;
       border-radius: 50%;
       overflow: hidden;
+      color: white;
     }
     .loggedin {
       padding: 0;
     }
-    .loggedout {
-      background-color: blue;
-      color: white;
-    }
   </style>
   
   <template>
-    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
-    <template is="dom-if" if="{{!isLoggedIn(user, statusKnown)}}">
-      <paper-icon-button on-tap="login"  icon="social:person-add" class="round loggedout" alt="Login" title="Login"></paper-icon-button>
+    <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" auto-login params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
+    <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'anonymous')}}">
+      <paper-icon-button on-tap="login"  icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
     </template>
-    <template is="dom-if" if="{{isLoggedIn(user, statusKnown)}}">
+    <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'google|password')}}">
       <paper-icon-button on-tap="logout" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
     </template>
   </template>
@@ -72,8 +70,8 @@
        */
       logout: function() {
         this.async(function(){
-          this.$.firebaseLogin.logout();
           this.provider = 'anonymous';
+          this.$.firebaseLogin.logout();
         }, 1);
         this.fire('iron-signal', {name: 'logout', data:null});
       },
@@ -87,11 +85,15 @@
         if (dialog) {
           dialog.close();
         }
+        this.provider = e.detail.user.provider;
         this.fire('iron-signal', {name: 'login-success', data: e.detail});
       },
       
-      isLoggedIn: function(user, statusKnown) {
-        return user && statusKnown;
+      isLoggedIn: function(user, statusKnown, provider) {
+        if(user && statusKnown){
+          return provider ? provider.indexOf(user.provider) != -1 : true;
+        }
+        return false;
       },
       
       userProvider: function (user) {

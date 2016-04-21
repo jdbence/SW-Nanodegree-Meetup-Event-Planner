@@ -1,24 +1,190 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
+<link rel="import" href="../../../bower_components/paper-typeahead-input/paper-typeahead-input.html">
+<link rel="import" href="../../../bower_components/paper-card/paper-card.html">
+<link rel="import" href="../../../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
+<link rel="import" href="../../../bower_components/google-map/google-map.html">
 
 <dom-module id="page-event">
   <style is="custom-style">
     h3 {
       text-align: center;
     }
+    paper-input {
+      padding-bottom: 10px;
+    }
+    google-map {
+      margin-top: 64px;
+      height: 300px;
+    }
+    .map-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+    }
+    .map-container:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .body-container {
+      margin: 260px 50px 50px 50px;
+    }
+    .card-page {
+      width: 100%;
+      min-height: 1000px;
+    }
+    .typehead {
+      max-height: 250px;
+      overflow-y: auto;
+      position: absolute;
+      z-index: 100;
+      width: 100%;
+      left: 0;
+      top: 30px;
+    }
+    .elipsis {
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .fake-label {
+      font-size: 12px;
+      color: #636363;
+    }
   </style>
   
-  <template>
-    <h3>Event {{id}} Page</h3>
+    <template>
+      <firebase-document location="{{eventLocation}}" data="{{event}}"></firebase-document>
+      <google-map-search class="picker" map="[[map]]" query="[[event.location]]" results="{{results}}"></google-map-search>
+      <section class="map-container">
+        <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
+          <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
+            <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
+              <h2>{{marker.name}}</h2>
+              <span>{{marker.formatted_address}}</span>
+            </google-map-marker>
+          </template>
+        </google-map>
+      </section>
+      <section class="body-container">
+        <paper-card class="card-page">
+          <div class="card-content">
+            <paper-input name="title" label="Title" required auto-validate error-message="Missing Title!" value="[[event.title]]"></paper-input>
+            <paper-typeahead-input input-value="{{event.location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required auto-validate error-message="Missing Location!"></paper-typeahead-input>
+            <paper-input name="start_time" value="[[event.start]]" label="Event Starts" hidden></paper-input>
+            <div>
+              <span class="fake-label">Event Starts</span>
+              <paper-datetime-picker-item icon="icons:today" date="[[event.start]]" iron-label-target></paper-datetime-picker-item>
+            </div>
+            <paper-input name="end_time" value="[[event.end]]" label="Event Ends" hidden></paper-input>
+            <div>
+              <span class="fake-label">Event Ends</span>
+              <paper-datetime-picker-item icon="icons:today" date="[[event.end]]" iron-label-target></paper-datetime-picker-item>
+            </div>
+            <paper-textarea name="description" label="Description" auto-validate error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
+            <paper-input name="type" list="eventList" label="Type" required auto-validate error-message="Missing Type!" value="[[event.type]]"></paper-input>
+            <datalist id="eventList">
+              <option value="Birthday"></option>
+              <option value="Meeting"></option>
+              <option value="Hike"></option>
+              <option value="Hackathon"></option>
+            </datalist>
+          </div>
+        <paper-card>
+      </section>
+      <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+      <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
   </template>
-  
+    
   <script>
     Polymer({
       is: 'page-event',
       properties: {
-        id: {
+        key: {
           type: String,
-          value: "?"
+          reflectToAttribute: true
+        },
+        eventLocation: {
+          type: String
+        },
+        map: {
+          type: Object
+        },
+        event: {
+          type: Object
+        },
+        results: {
+          type: Array
+        },
+        showLocations: {
+          type: Boolean,
+          value: false
+        },
+        uid: {
+          type:String
+        },
+        latitude: {
+          type: Number,
+          value: null
+        },
+        longitude: {
+          type: Number,
+          value: null
         }
+      },
+      handleLogin: function(e) {
+        this.uid = e.detail.user.uid;
+        
+        // update eventLocation when key and uid are valid
+        this.show();
+      },
+      
+      show: function(){
+        if(this.uid && this.key){
+          this.eventLocation = 'https://u-swd-p1.firebaseio.com/events/' + this.uid + '/list/' + this.key;
+        }
+      },
+      
+      handleLogout: function(e) {
+        this.eventLocation = '';
+        this.key = undefined;
+        this.uid = undefined;
+      },
+      
+      computeResults: function(r) {
+        if(r.length > 0) {
+          var loc = r[0];
+          this.latitude = loc.latitude;
+          this.longitude = loc.longitude;
+        }
+        return r;
+      },
+      
+      computeCandidates: function(results) {
+        var i, t = results.length;
+        var candidates = [];
+        for(i=0; i<t; i++) {
+          candidates.push(this.computeLocationName(results[i]));
+        }
+        return candidates;
+      },
+      
+      computeLocationName: function(option) {
+        if(option.formatted_address.indexOf(option.name) != -1) {
+          return option.formatted_address;
+        }
+        return option.name + ' - ' + option.formatted_address;
       }
     });
   </script>

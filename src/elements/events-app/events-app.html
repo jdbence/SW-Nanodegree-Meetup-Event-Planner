@@ -51,7 +51,7 @@
     <template is="dom-bind" id="app">
       <carbon-location route={{route}}></carbon-location>
       <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
-      <carbon-route route="{{subroute}}" pattern="/:id" data="{{subrouteData}}"></carbon-route>
+      <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
     
       <app-drawer-layout force-narrow narrow>
         <app-drawer id="startDrawer" align="start" >
@@ -69,7 +69,7 @@
             </app-toolbar>
           </app-header>
           <iron-pages attr-for-selected="data-url" selected="[[data.page]]">
-            <page-event data-url="event" id="[[subrouteData.id]]"></page-event>
+            <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
             <page-events data-url="events"></page-events>
             <page-profile data-url="profile"></page-profile>
           </iron-pages>
@@ -89,20 +89,23 @@
         data: {
           type: Object
         },
-        pageURL: {
-          type: String,
-          computed: 'computeSelectedRoute(data)'
+        subrouteData: {
+          type: Object
         }
-      },
-      computeSelectedRoute: function(page) {
-        // var data = this.properties.data;
-        // var subrouteData = this.properties.subrouteData;
-        console.log('sssssss', page);
-        return page ? page : 'events';
       },
       ready: function() {
         document.getElementById('skeleton').remove();
         Polymer.dom(this).removeAttribute('unresolved');
+        var pages = document.getElementById("pages");
+        if(pages){
+          pages.addEventListener('iron-select', this._itemSelected);
+        }
+      },
+      _itemSelected: function(e) {
+        var page = e.detail.item;
+        if(page.show){
+          page.show();
+        }
       }
     });
   </script>

@@ -4,14 +4,12 @@
 <link rel="import" href="../../../bower_components/paper-input/paper-input.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
 <link rel="import" href="../../../bower_components/paper-card/paper-card.html">
-<link rel="import" href="../../../bower_components/paper-listbox/paper-listbox.html">
 <link rel="import" href="../../../bower_components/paper-date-picker-item/paper-datetime-picker-item.html">
 <link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../../../bower_components/iron-form/iron-form.html">
 <link rel="import" href="../../../bower_components/iron-ajax/iron-ajax.html">
-<link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
-<link rel="import" href="../../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../../bower_components/iron-label/iron-label.html">
+<link rel="import" href="../../../bower_components/moment-element/moment-import.html">
 <link rel="import" href="../../../bower_components/google-map/google-map.html">
 <link rel="import" href="../../../bower_components/google-map/google-map-search.html">
 <link rel="import" href="../lib/lodash.html">
@@ -101,26 +99,16 @@
             <option value="Hike"></option>
             <option value="Hackathon"></option>
           </datalist>
-          <iron-label>
+          <paper-input name="start_time" value="{{today}}" label="When" hidden></paper-input>
+          <div>
             <span>When</span>
-            <paper-datetime-picker-item icon="icons:today" date="{{today}}" default-time="09:00" iron-label-target></paper-datetime-picker-item>
-          </iron-label>
-          <paper-input name="location" value="{{location}}" label="Location" on-focus="handleLocationFocus" on-blur="handleLocationBlur" required auto-validate error-message="Missing Location!">
-            <iron-icon icon="search" prefix></iron-icon>
-            <paper-card hidden$="{{computeShowLocations(showLocations, location, results)}}" suffix>
-              <paper-listbox>
-                <template is="dom-repeat" items="{{results}}" as="option">
-                  <paper-item on-tap="handleLocationSelect" data-option$="{{option}}">
-                    <iron-icon icon="maps:place" prefix></iron-icon>
-                    <span class="elipsis">{{computeLocationName(option)}}</span>
-                  </paper-item>
-                </template>
-              </paper-listbox>
-            </paper-card>
-          </paper-input>
+            <paper-datetime-picker-item icon="icons:today" date="{{today}}" iron-label-target></paper-datetime-picker-item>
+          </div>
+          <paper-typeahead-input name="location" input-value="{{location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required auto-validate error-message="Missing Location!"></paper-typeahead-input>
+          
           <div class="map-container">
-            <google-map map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
-              <template is="dom-repeat" items="{{results}}" as="marker">
+            <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
+              <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
                 <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
                   <h2>{{marker.name}}</h2>
                   <span>{{marker.formatted_address}}</span>
@@ -174,7 +162,9 @@
         },
         today: {
           type: String,
-          value: new Date().getTime()//'April 1, 2015'//new Date().getTime()
+          value: function() {
+            return this.next30(new Date().getTime());
+          }
         }
       },
       
@@ -188,28 +178,63 @@
       
       /**
        * Disable login form's submit button when form is invalid
-       *
        */
       onFormChange: function () {
-        console.log('onFormChange', this.$.eventForm.validate());
         this.$.createSubmit.disabled = !this.$.eventForm.validate();
       },
       
+      /**
+       * Whenever the form is opened update the values
+       */
       handleDialogOpen: function() {
         this.getLocation();
         this.onFormChange();
       },
       
+      /**
+       * Returns a JSON formatted object for latitude / longitude
+       * @returns {Object} - JSON formatted object
+       */
       computeLatLng: function (latitude, longitude) {
         return {
           "latlng": latitude + "," + longitude
         };
       },
       
-      computeShowLocations: function(show, location, results) {
-        return !show || (show && results.length === 0) || (location === '');
+      /**
+       * Updates lat/long with first restult object and returns an Array of address objects (up to 3)
+       * @param {Array} results - Array of Location objects from Google API
+       * @returns {Array} - Array of address objects
+       */
+      computeResults: function(results) {
+        if(results.length > 0) {
+          var loc = results[0];
+          this.latitude = loc.latitude;
+          this.longitude = loc.longitude;
+        }
+        return results.splice(0, 3);
       },
       
+      /**
+       * Returns an Array of addresses (up to 3)
+       * @param {Array} results - Array of Location objects from Google API
+       * @returns {Array} - Array of address strings
+       */
+      computeCandidates: function(results) {
+        var t = Math.min(results.length, 3);
+        var candidates = [];
+        var i;
+        for(i=0; i<t; i++) {
+          candidates.push(this.computeLocationName(results[i]));
+        }
+        return candidates;
+      },
+      
+      /**
+       * Returns the address of the location
+       * @param {Object} option - Location object from Google API
+       * @returns {String} - address of the location
+       */
       computeLocationName: function(option) {
         if(option.formatted_address.indexOf(option.name) != -1) {
           return option.formatted_address;
@@ -217,75 +242,79 @@
         return option.name + ' - ' + option.formatted_address;
       },
       
-      handleLocationSelect: function(e) {
-        if(e.currentTarget.dataset.option){
-          var option = JSON.parse(e.currentTarget.dataset.option);
-          
-          // clear values so map will recenter on click
-          this.location = this.latitude = this.longitude = '';
-          
-          this.async(function() {
-            // set location via street address or business & street address
-            this.location = this.computeLocationName(option);
-            // focus on location with the map
-            this.latitude = option.latitude;
-            this.longitude = option.longitude;
-          });
-          
-          // hide list
-          this.showLocations = false;
-          this.cancelAsync(this.blurAsync);
-        }
-      },
-      
-      handleLocationFocus: function(e) {
-        this.showLocations = true;
-        this.cancelAsync(this.blurAsync);
-      },
-      
-      handleLocationBlur: function(e) {
-        this.blurAsync = this.async(function() {
-          this.showLocations = false;
-        }, 200);
-      },
-      
+      /**
+       * Creates a new event if the form is valid
+       */
       handleCreate: function() {
         if(this.$.eventForm.validate()){
           var data = this.$.eventForm.serialize();
-          var now = new Date().getTime()
-          console.log(data, today);
-          return;
+          var time = new Date(data.start_time).getTime();
+          
+          // request to create the event
           this.fire('create', {
-            location: data.location,
+            //TODO: use name prop after typehead supports property passthrough
+            location: this.location, //data.location,
             type: data.type,
-            start: now,
-            end: now,
+            start: time,
+            end: time,
             title: data.type,
             description: "",
             host: "",
+            created: Firebase.ServerValue.TIMESTAMP
           });
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
         }
       },
       
+      /**
+       * Attempts to get the lat/long information from the navigator and location from Google API
+       */
       getLocation: function() {
         if (navigator && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(this.handleGetLocation.bind(this));
+          navigator.geolocation.getCurrentPosition(function(position) {
+            var point = position.coords;
+            this.latitude = point.latitude;
+            this.longitude = point.longitude;
+            this.$.ajax.generateRequest();
+          }.bind(this));
         }
       },
       
-      handleGetLocation: function(position) {
-        var point = position.coords;
-        this.latitude = point.latitude;
-        this.longitude = point.longitude;
-        this.$.ajax.generateRequest();
-      },
-      
+      /**
+       * Google API returns the address location about the lat/long
+       * @param {Event} event - AJAX reponse from Google API
+       */
       handleGetStreetAddress: function(event) {
         var results = (event.detail && event.detail.response && event.detail.response.results) ? event.detail.response.results : [];
         var matched = _.find(results, function(o) { return o.types.indexOf('street_address') >= 0 });
         if(matched){
           this.location = matched.formatted_address;
         }
+      },
+      
+      /**
+       * Gets time rounded to the next 30 minutes
+       * @param {Number} time - Time in millisecond
+       * @param {String} type - Expect reponse as 'millisecond' or 'moment'
+       * @returns {Number|Moment} - time rounded to the next 30 minutes
+       */
+      next30: function(time, type){
+      	type = type || 'millisecond';
+        var m = moment(time);
+        var seconds = m.seconds();
+        var minutes = m.minute()
+        minutes = minutes >= 30 ? 60 - minutes : 30 - minutes;
+        m.add(minutes, 'minutes').subtract(seconds, 'seconds');
+        
+        if(type === 'moment'){
+        	return m
+        }
+        return m.valueOf();
       }
       
     });
