@@ -23174,6 +23174,76 @@ value. `setMax` should move the slider to the maximum value.
 
   </script>
 </dom-module>
+<script>
+(function(){
+/**
+`iron-signals` provides basic publish-subscribe functionality.
+
+Note: avoid using `iron-signals` whenever you can use
+a controller (parent element) to mediate communication
+instead.
+
+To send a signal, fire a custom event of type `iron-signal`, with
+a detail object containing `name` and `data` fields.
+
+    this.fire('iron-signal', {name: 'hello', data: null});
+
+To receive a signal, listen for `iron-signal-<name>` event on a
+`iron-signals` element.
+
+  <iron-signals on-iron-signal-hello="{{helloSignal}}">
+
+You can fire a signal event from anywhere, and all
+`iron-signals` elements will receive the event, regardless
+of where they are in DOM.
+
+@demo demo/index.html
+*/
+  Polymer({
+    is: 'iron-signals',
+
+    attached: function() {
+      signals.push(this);
+    },
+    detached: function() {
+      var i = signals.indexOf(this);
+      if (i >= 0) {
+        signals.splice(i, 1);
+      }
+    }
+  });
+
+  // private shared database
+  var signals = [];
+
+  // signal dispatcher
+  function notify(name, data) {
+    // convert generic-signal event to named-signal event
+    var signal = new CustomEvent('iron-signal-' + name, {
+      // if signals bubble, it's easy to get confusing duplicates
+      // (1) listen on a container on behalf of local child
+      // (2) some deep child ignores the event and it bubbles
+      //     up to said container
+      // (3) local child event bubbles up to container
+      // also, for performance, we avoid signals flying up the
+      // tree from all over the place
+      bubbles: false,
+      detail: data
+    });
+    // dispatch named-signal to all 'signals' instances,
+    // only interested listeners will react
+    signals.forEach(function(s) {
+      s.dispatchEvent(signal);
+    });
+  }
+
+  // signal listener at document
+  document.addEventListener('iron-signal', function(e) {
+    notify(e.detail.name, e.detail.data);
+  });
+
+})();
+</script>
 
 
 <dom-module id="paper-header-panel" assetpath="../../bower_components/paper-header-panel/">
@@ -28933,76 +29003,6 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
     });
   </script>
 </dom-module>
-<script>
-(function(){
-/**
-`iron-signals` provides basic publish-subscribe functionality.
-
-Note: avoid using `iron-signals` whenever you can use
-a controller (parent element) to mediate communication
-instead.
-
-To send a signal, fire a custom event of type `iron-signal`, with
-a detail object containing `name` and `data` fields.
-
-    this.fire('iron-signal', {name: 'hello', data: null});
-
-To receive a signal, listen for `iron-signal-<name>` event on a
-`iron-signals` element.
-
-  <iron-signals on-iron-signal-hello="{{helloSignal}}">
-
-You can fire a signal event from anywhere, and all
-`iron-signals` elements will receive the event, regardless
-of where they are in DOM.
-
-@demo demo/index.html
-*/
-  Polymer({
-    is: 'iron-signals',
-
-    attached: function() {
-      signals.push(this);
-    },
-    detached: function() {
-      var i = signals.indexOf(this);
-      if (i >= 0) {
-        signals.splice(i, 1);
-      }
-    }
-  });
-
-  // private shared database
-  var signals = [];
-
-  // signal dispatcher
-  function notify(name, data) {
-    // convert generic-signal event to named-signal event
-    var signal = new CustomEvent('iron-signal-' + name, {
-      // if signals bubble, it's easy to get confusing duplicates
-      // (1) listen on a container on behalf of local child
-      // (2) some deep child ignores the event and it bubbles
-      //     up to said container
-      // (3) local child event bubbles up to container
-      // also, for performance, we avoid signals flying up the
-      // tree from all over the place
-      bubbles: false,
-      detail: data
-    });
-    // dispatch named-signal to all 'signals' instances,
-    // only interested listeners will react
-    signals.forEach(function(s) {
-      s.dispatchEvent(signal);
-    });
-  }
-
-  // signal listener at document
-  document.addEventListener('iron-signal', function(e) {
-    notify(e.detail.name, e.detail.data);
-  });
-
-})();
-</script>
 <script>//! moment.js
 //! version : 2.12.0
 //! authors : Tim Wood, Iskren Chernev, Moment.js contributors
@@ -45782,6 +45782,7 @@ Polymer.PaperDatePickerItemBehavior = {
     <iron-ajax id="ajax" url="http://maps.googleapis.com/maps/api/geocode/json" params="{{computeLatLng(latitude, longitude)}}" handle-as="json" on-response="handleGetStreetAddress" debounce-duration="300">
     </iron-ajax>
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
+    <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <paper-dialog id="eventDialog" modal="">
       <section>
         <h2>Create Event</h2>
@@ -45859,6 +45860,9 @@ Polymer.PaperDatePickerItemBehavior = {
           value: function() {
             return this.next30(new Date().getTime());
           }
+        },
+        host: {
+          type: String
         }
       },
       
@@ -45953,7 +45957,8 @@ Polymer.PaperDatePickerItemBehavior = {
             end: time,
             title: data.type,
             description: "",
-            host: "",
+            host: this.host,
+            guests: "",
             created: Firebase.ServerValue.TIMESTAMP
           });
           
@@ -45963,6 +45968,40 @@ Polymer.PaperDatePickerItemBehavior = {
           // close dialog
           this.$.eventDialog.close();
         }
+      },
+      
+      /**
+       * Returns the provider object for the user
+       *
+       */
+      userProvider: function (user) {
+        return user && user.provider && user[user.provider] ? user[user.provider] : {};
+      },
+      
+      /**
+       * Returns the users name
+       *
+       */
+      profileName: function(user) {
+        var p = this.userProvider(user);
+        return p.displayName ? p.displayName : '';
+      },
+      
+      /**
+       * Returns the users email
+       *
+       */
+      profileEmail: function(user) {
+        var p = this.userProvider(user);
+        return p.email ? p.email : '';
+      },
+      
+      /**
+       * Sets the default host based on the person logged in
+       *
+       */
+      handleLogin: function(event) {
+        this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
       },
       
       /**
@@ -46945,6 +46984,16 @@ Polymer.PaperDatePickerItemBehavior = {
       font-size: 12px;
       color: #636363;
     }
+    
+    @media (max-width: 600px) {
+      .body-container {
+        margin: 260px 0 0 0;
+      }
+      .card-page {
+        width: 100%;
+        min-height: auto;
+      }
+    }
   </style>
   
     <template>
@@ -46975,7 +47024,7 @@ Polymer.PaperDatePickerItemBehavior = {
               <span class="fake-label">Event Ends</span>
               <paper-datetime-picker-item icon="icons:today" date="[[event.end]]" iron-label-target=""></paper-datetime-picker-item>
             </div>
-            <paper-textarea name="description" label="Description" auto-validate="" error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
+            <paper-textarea name="description" label="Description (optional)" auto-validate="" error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
             <paper-input name="type" list="eventList" label="Type" required="" auto-validate="" error-message="Missing Type!" value="[[event.type]]"></paper-input>
             <datalist id="eventList">
               <option value="Birthday"></option>
@@ -46983,6 +47032,8 @@ Polymer.PaperDatePickerItemBehavior = {
               <option value="Hike"></option>
               <option value="Hackathon"></option>
             </datalist>
+            <paper-input name="host" label="Host" required="" auto-validate="" error-message="Missing Host!" value="[[event.host]]"></paper-input>
+            <paper-textarea name="guests" label="Guest List" required="" auto-validate="" error-message="Missing Guests!" value="[[event.guests]]"></paper-textarea>
           </div>
         <paper-card>
       </paper-card></paper-card></section>
@@ -46995,8 +47046,7 @@ Polymer.PaperDatePickerItemBehavior = {
       is: 'page-event',
       properties: {
         key: {
-          type: String,
-          reflectToAttribute: true
+          type: String
         },
         eventLocation: {
           type: String
@@ -47034,15 +47084,17 @@ Polymer.PaperDatePickerItemBehavior = {
       },
       
       show: function(){
+        console.log('show', this, this.uid, this.key)
         if(this.uid && this.key){
           this.eventLocation = 'https://u-swd-p1.firebaseio.com/events/' + this.uid + '/list/' + this.key;
         }
+        document.body.scrollTop = document.documentElement.scrollTop = 0;
       },
       
       handleLogout: function(e) {
         this.eventLocation = '';
-        this.key = undefined;
-        this.uid = undefined;
+        // this.key = undefined;
+        // this.uid = undefined;
       },
       
       computeResults: function(r) {
@@ -47110,38 +47162,38 @@ Polymer.PaperDatePickerItemBehavior = {
     }
     
   </style>
-  <template>
-    <template is="dom-bind" id="app">
-      <carbon-location route="{{route}}"></carbon-location>
-      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
-      <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
-    
-      <app-drawer-layout force-narrow="" narrow="">
-        <app-drawer id="startDrawer" align="start">
-          <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-            <paper-item data-url="events">Events</paper-item>
-            <paper-item data-url="profile">Profile</paper-item>
-          </paper-menu>
-        </app-drawer>
-        <app-header-layout>
-          <app-header fixed="">
-            <app-toolbar>
-              <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
-              <div title="">Event Planner</div>
-              <profile-button></profile-button>
-            </app-toolbar>
-          </app-header>
-          <iron-pages attr-for-selected="data-url" selected="[[data.page]]">
-            <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
-            <page-events data-url="events"></page-events>
-            <page-profile data-url="profile"></page-profile>
-          </iron-pages>
-        </app-header-layout>
-      </app-drawer-layout>
-    </template>
+  
+  <template id="app">
+    <carbon-location route="{{route}}"></carbon-location>
+    <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
+    <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
+    <app-drawer-layout force-narrow="" narrow="">
+      <app-drawer id="startDrawer" align="start">
+        <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
+          <paper-item data-url="events">Events</paper-item>
+          <paper-item data-url="profile">Profile</paper-item>
+        </paper-menu>
+      </app-drawer>
+      <app-header-layout>
+        <app-header fixed="">
+          <app-toolbar>
+            <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
+            <div title="">Event Planner</div>
+            <profile-button></profile-button>
+          </app-toolbar>
+        </app-header>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]">
+          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="events"></page-events>
+          <page-profile data-url="profile"></page-profile>
+        </iron-pages>
+      </app-header-layout>
+    </app-drawer-layout>
+    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
     <dialog-login></dialog-login>
     <dialog-register></dialog-register>
   </template>
+  
   <script>
     Polymer({
       is: 'events-app',
@@ -47150,24 +47202,32 @@ Polymer.PaperDatePickerItemBehavior = {
           type: Object
         },
         data: {
-          type: Object
+          type: Object,
+          value: function() {
+            return {};
+          }
         },
         subrouteData: {
           type: Object
         }
       },
+      listeners: {
+        'pages.iron-select': '_itemSelected'
+      },
       ready: function() {
         document.getElementById('skeleton').remove();
         Polymer.dom(this).removeAttribute('unresolved');
-        var pages = document.getElementById("pages");
-        if(pages){
-          pages.addEventListener('iron-select', this._itemSelected);
-        }
       },
       _itemSelected: function(e) {
         var page = e.detail.item;
         if(page.show){
-          page.show();
+          this.async(page.show.bind(page), 100);
+        }
+      },
+      handleLogout: function() {
+        // put user at events page on logout
+        if(this.data.page != 'events'){
+          window.location = '/events';
         }
       }
     });

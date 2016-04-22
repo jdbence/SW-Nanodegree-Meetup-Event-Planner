@@ -62,6 +62,16 @@
       font-size: 12px;
       color: #636363;
     }
+    
+    @media (max-width: 600px) {
+      .body-container {
+        margin: 260px 0 0 0;
+      }
+      .card-page {
+        width: 100%;
+        min-height: auto;
+      }
+    }
   </style>
   
     <template>
@@ -92,7 +102,7 @@
               <span class="fake-label">Event Ends</span>
               <paper-datetime-picker-item icon="icons:today" date="[[event.end]]" iron-label-target></paper-datetime-picker-item>
             </div>
-            <paper-textarea name="description" label="Description" auto-validate error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
+            <paper-textarea name="description" label="Description (optional)" auto-validate error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
             <paper-input name="type" list="eventList" label="Type" required auto-validate error-message="Missing Type!" value="[[event.type]]"></paper-input>
             <datalist id="eventList">
               <option value="Birthday"></option>
@@ -100,6 +110,8 @@
               <option value="Hike"></option>
               <option value="Hackathon"></option>
             </datalist>
+            <paper-input name="host" label="Host" required auto-validate error-message="Missing Host!" value="[[event.host]]"></paper-input>
+            <paper-textarea name="guests" label="Guest List" required auto-validate error-message="Missing Guests!" value="[[event.guests]]"></paper-textarea>
           </div>
         <paper-card>
       </section>
@@ -112,8 +124,7 @@
       is: 'page-event',
       properties: {
         key: {
-          type: String,
-          reflectToAttribute: true
+          type: String
         },
         eventLocation: {
           type: String
@@ -151,15 +162,17 @@
       },
       
       show: function(){
+        console.log('show', this, this.uid, this.key)
         if(this.uid && this.key){
           this.eventLocation = 'https://u-swd-p1.firebaseio.com/events/' + this.uid + '/list/' + this.key;
         }
+        document.body.scrollTop = document.documentElement.scrollTop = 0;
       },
       
       handleLogout: function(e) {
         this.eventLocation = '';
-        this.key = undefined;
-        this.uid = undefined;
+        // this.key = undefined;
+        // this.uid = undefined;
       },
       
       computeResults: function(r) {
