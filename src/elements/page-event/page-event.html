@@ -1,14 +1,17 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-input.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
 <link rel="import" href="../../../bower_components/paper-typeahead-input/paper-typeahead-input.html">
 <link rel="import" href="../../../bower_components/paper-card/paper-card.html">
 <link rel="import" href="../../../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
 <link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
 <link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
 <link rel="import" href="../../../bower_components/google-map/google-map.html">
+<link rel="import" href="../polyfill/object-assign.html">
 
 <dom-module id="page-event">
   <style is="custom-style">
@@ -38,7 +41,7 @@
       z-index: 1;
     }
     .body-container {
-      margin: 260px 50px 50px 50px;
+      margin: 260px 20px 20px 20px;
     }
     .card-page {
       width: 100%;
@@ -62,12 +65,42 @@
       font-size: 12px;
       color: #636363;
     }
+    .back {
+      margin: 20px;
+      position: absolute;
+      top: 64px;
+      left: 0;
+      z-index: 1;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
+    .fab-event {
+      margin: 20px;
+      position: fixed;
+      bottom: 0;
+      right: 0;
+    }
+    
+    @media (max-width: 600px) {
+      .body-container {
+        margin: 260px 0 0 0;
+      }
+      .card-page {
+        width: 100%;
+        min-height: auto;
+      }
+    }
   </style>
   
     <template>
       <firebase-document location="{{eventLocation}}" data="{{event}}"></firebase-document>
       <google-map-search class="picker" map="[[map]]" query="[[event.location]]" results="{{results}}"></google-map-search>
       <section class="map-container">
+        <paper-button class="back" on-tap="handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
         <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
           <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
             <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
@@ -80,30 +113,35 @@
       <section class="body-container">
         <paper-card class="card-page">
           <div class="card-content">
-            <paper-input name="title" label="Title" required auto-validate error-message="Missing Title!" value="[[event.title]]"></paper-input>
-            <paper-typeahead-input input-value="{{event.location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required auto-validate error-message="Missing Location!"></paper-typeahead-input>
-            <paper-input name="start_time" value="[[event.start]]" label="Event Starts" hidden></paper-input>
-            <div>
-              <span class="fake-label">Event Starts</span>
-              <paper-datetime-picker-item icon="icons:today" date="[[event.start]]" iron-label-target></paper-datetime-picker-item>
-            </div>
-            <paper-input name="end_time" value="[[event.end]]" label="Event Ends" hidden></paper-input>
-            <div>
-              <span class="fake-label">Event Ends</span>
-              <paper-datetime-picker-item icon="icons:today" date="[[event.end]]" iron-label-target></paper-datetime-picker-item>
-            </div>
-            <paper-textarea name="description" label="Description" auto-validate error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
-            <paper-input name="type" list="eventList" label="Type" required auto-validate error-message="Missing Type!" value="[[event.type]]"></paper-input>
-            <datalist id="eventList">
-              <option value="Birthday"></option>
-              <option value="Meeting"></option>
-              <option value="Hike"></option>
-              <option value="Hackathon"></option>
-            </datalist>
+            <form is="iron-form" id="editForm" action="/">
+              <paper-input name="title" label="Title" required auto-validate error-message="Missing Title!" value="{{eventClone.title::input}}"></paper-input>
+              <paper-typeahead-input input-value="{{eventClone.location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required auto-validate error-message="Missing Location!"></paper-typeahead-input>
+              <paper-input name="start_time" value="[[eventClone.start]]" label="Event Starts" hidden></paper-input>
+              <div>
+                <span class="fake-label">Event Starts</span>
+                <paper-datetime-picker-item icon="icons:today" date="{{eventClone.start}}" iron-label-target></paper-datetime-picker-item>
+              </div>
+              <paper-input name="end_time" value="[[eventClone.end]]" label="Event Ends" hidden></paper-input>
+              <div>
+                <span class="fake-label">Event Ends</span>
+                <paper-datetime-picker-item icon="icons:today" date="{{eventClone.end}}" iron-label-target></paper-datetime-picker-item>
+              </div>
+              <paper-textarea name="description" label="Description (optional)" auto-validate error-message="Missing Description!" value="{{eventClone.description}}"></paper-textarea>
+              <paper-input name="type" list="eventList" label="Type" required auto-validate error-message="Missing Type!" value="{{eventClone.type}}"></paper-input>
+              <datalist id="eventList">
+                <option value="Birthday"></option>
+                <option value="Meeting"></option>
+                <option value="Hike"></option>
+                <option value="Hackathon"></option>
+              </datalist>
+              <paper-input name="host" label="Host" required auto-validate error-message="Missing Host!" value="{{eventClone.host}}"></paper-input>
+              <paper-textarea name="guests" label="Guest List" required auto-validate error-message="Missing Guests!" value="{{eventClone.guests}}"></paper-textarea>
+            </form>
           </div>
         <paper-card>
       </section>
-      <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+      <paper-fab id="editSubmit" noink icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
+      <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
   </template>
     
@@ -112,8 +150,7 @@
       is: 'page-event',
       properties: {
         key: {
-          type: String,
-          reflectToAttribute: true
+          type: String
         },
         eventLocation: {
           type: String
@@ -122,6 +159,10 @@
           type: Object
         },
         event: {
+          type: Object,
+          observer: 'computeEventClone'
+        },
+        eventClone: {
           type: Object
         },
         results: {
@@ -143,6 +184,22 @@
           value: null
         }
       },
+      
+      observers: [
+        'computeEventCloneValidate(eventClone.*)'
+      ],
+      
+      ready: function(){
+        this.$.editForm.addEventListener('input', this.onFormChange.bind(this));
+      },
+      
+      /**
+       * Disable form's submit button when form is invalid
+       */
+      onFormChange: function () {
+        this.$.editSubmit.disabled = !this.$.editForm.validate();
+      },
+      
       handleLogin: function(e) {
         this.uid = e.detail.user.uid;
         
@@ -154,12 +211,58 @@
         if(this.uid && this.key){
           this.eventLocation = 'https://u-swd-p1.firebaseio.com/events/' + this.uid + '/list/' + this.key;
         }
+        document.body.scrollTop = document.documentElement.scrollTop = 0;
       },
       
       handleLogout: function(e) {
         this.eventLocation = '';
-        this.key = undefined;
-        this.uid = undefined;
+        // this.key = undefined;
+        // this.uid = undefined;
+      },
+      
+      /**
+       * Returns user to the events page
+       *
+       */
+      handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      
+      /**
+       * Saves the form data if it's validated
+       *
+       */
+      handleSaveEvent: function() {
+        // convert times into milliseconds
+        this.eventClone.start = new Date(this.eventClone.start).getTime();
+        this.eventClone.end = new Date(this.eventClone.end).getTime();
+        if(this.$.editForm.validate()){
+          this.event = Object.assign({}, this.eventClone);
+        }
+      },
+      
+      /**
+       * Clone the event so form inputs can edit locally and revalidate the form
+       *
+       */
+      computeEventClone: function(event) {
+        this.set('eventClone', Object.assign({}, event));
+        this.onFormChange();
+      },
+      
+      /**
+       * Make sure the event dates stay within eachothers bounds
+       */
+      computeEventCloneValidate: function(record) {
+        if(record.path === 'eventClone.start' || record.path === 'eventClone.end'){
+          var start = new Date(record.base.start).getTime();
+          var end = new Date(record.base.end).getTime();
+          if(start > end){
+            this.set('eventClone.end', start);
+          }else if(end < start){
+            this.set('eventClone.start', end);
+          }
+        }
       },
       
       computeResults: function(r) {

@@ -1,19 +1,67 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../../bower_components/paper-card/paper-card.html">
 
 <dom-module id="page-profile">
   <style is="custom-style">
     h3 {
       text-align: center;
     }
+    .body-container {
+      padding-bottom: 20px;
+      margin: 20px;
+    }
+    .logout {
+      background-color: var(--paper-indigo-500);
+      color: white;
+    }
+    .logout:hover {
+      background-color: var(--paper-indigo-400);
+    }
+    .back {
+      margin: 20px;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
+    .full {
+      width: 100%;
+    }
   </style>
   
   <template>
-    <h3>Profile Page</h3>
+    <section class="body-container">
+      <div>
+        <paper-button class="back" on-tap="_handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
+      </div>
+      <paper-card class="full">
+        <div class="card-content">
+          <paper-button class="logout" raised noink on-tap="_handleLogout">Logout</paper-button>
+        </div>
+      </paper-card>
+    </section>
   </template>
   
   <script>
     Polymer({
-      is: 'page-profile'
+      is: 'page-profile',
+      /**
+       * Returns user to the events page
+       *
+       */
+      _handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      /**
+       * Request to logout the user
+       *
+       */
+      _handleLogout: function() {
+        this.fire('iron-signal', {name: 'logout'});
+      }
     });
   </script>
 </dom-module>

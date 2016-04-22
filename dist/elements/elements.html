@@ -23174,6 +23174,76 @@ value. `setMax` should move the slider to the maximum value.
 
   </script>
 </dom-module>
+<script>
+(function(){
+/**
+`iron-signals` provides basic publish-subscribe functionality.
+
+Note: avoid using `iron-signals` whenever you can use
+a controller (parent element) to mediate communication
+instead.
+
+To send a signal, fire a custom event of type `iron-signal`, with
+a detail object containing `name` and `data` fields.
+
+    this.fire('iron-signal', {name: 'hello', data: null});
+
+To receive a signal, listen for `iron-signal-<name>` event on a
+`iron-signals` element.
+
+  <iron-signals on-iron-signal-hello="{{helloSignal}}">
+
+You can fire a signal event from anywhere, and all
+`iron-signals` elements will receive the event, regardless
+of where they are in DOM.
+
+@demo demo/index.html
+*/
+  Polymer({
+    is: 'iron-signals',
+
+    attached: function() {
+      signals.push(this);
+    },
+    detached: function() {
+      var i = signals.indexOf(this);
+      if (i >= 0) {
+        signals.splice(i, 1);
+      }
+    }
+  });
+
+  // private shared database
+  var signals = [];
+
+  // signal dispatcher
+  function notify(name, data) {
+    // convert generic-signal event to named-signal event
+    var signal = new CustomEvent('iron-signal-' + name, {
+      // if signals bubble, it's easy to get confusing duplicates
+      // (1) listen on a container on behalf of local child
+      // (2) some deep child ignores the event and it bubbles
+      //     up to said container
+      // (3) local child event bubbles up to container
+      // also, for performance, we avoid signals flying up the
+      // tree from all over the place
+      bubbles: false,
+      detail: data
+    });
+    // dispatch named-signal to all 'signals' instances,
+    // only interested listeners will react
+    signals.forEach(function(s) {
+      s.dispatchEvent(signal);
+    });
+  }
+
+  // signal listener at document
+  document.addEventListener('iron-signal', function(e) {
+    notify(e.detail.name, e.detail.data);
+  });
+
+})();
+</script>
 
 
 <dom-module id="paper-header-panel" assetpath="../../bower_components/paper-header-panel/">
@@ -24965,11 +25035,12 @@ value. `setMax` should move the slider to the maximum value.
   <template>
     <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" auto-login="" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'anonymous')}}">
-      <paper-icon-button on-tap="login" icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
+      <paper-icon-button on-tap="_handleLogin" icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
     </template>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'google|password')}}">
-      <paper-icon-button on-tap="logout" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+      <paper-icon-button on-tap="showProfile" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
     </template>
+    <iron-signals on-iron-signal-logout="_handleLogout"></iron-signals>
   </template>
   
   <script>
@@ -25003,7 +25074,7 @@ value. `setMax` should move the slider to the maximum value.
        * Show login dialog
        *
        */
-      login: function() {
+      _handleLogin: function() {
         var dialog = document.getElementById('loginDialog');
         if (dialog) {
           dialog.open();
@@ -25014,12 +25085,20 @@ value. `setMax` should move the slider to the maximum value.
        * Request logout
        *
        */
-      logout: function() {
+      _handleLogout: function() {
         this.async(function(){
           this.provider = 'anonymous';
           this.$.firebaseLogin.logout();
         }, 1);
-        this.fire('iron-signal', {name: 'logout', data:null});
+        this.fire('iron-signal', {name: 'logout-success', data:null});
+      },
+      
+      /**
+       * Request to show the profile page
+       *
+       */
+      showProfile: function() {
+        this.fire('iron-signal', {name: 'url', data:'/profile'});
       },
       
       /**
@@ -25173,6 +25252,7 @@ value. `setMax` should move the slider to the maximum value.
           <paper-input name="name" label="Name" required="" auto-validate="" autofocus="" minlength="2" error-message="Atleast 2 characters"></paper-input>
           <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
+          <paper-input name="employer" label="Employer (optional)"></paper-input>
           <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
           <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
         </form>
@@ -28933,76 +29013,6 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
     });
   </script>
 </dom-module>
-<script>
-(function(){
-/**
-`iron-signals` provides basic publish-subscribe functionality.
-
-Note: avoid using `iron-signals` whenever you can use
-a controller (parent element) to mediate communication
-instead.
-
-To send a signal, fire a custom event of type `iron-signal`, with
-a detail object containing `name` and `data` fields.
-
-    this.fire('iron-signal', {name: 'hello', data: null});
-
-To receive a signal, listen for `iron-signal-<name>` event on a
-`iron-signals` element.
-
-  <iron-signals on-iron-signal-hello="{{helloSignal}}">
-
-You can fire a signal event from anywhere, and all
-`iron-signals` elements will receive the event, regardless
-of where they are in DOM.
-
-@demo demo/index.html
-*/
-  Polymer({
-    is: 'iron-signals',
-
-    attached: function() {
-      signals.push(this);
-    },
-    detached: function() {
-      var i = signals.indexOf(this);
-      if (i >= 0) {
-        signals.splice(i, 1);
-      }
-    }
-  });
-
-  // private shared database
-  var signals = [];
-
-  // signal dispatcher
-  function notify(name, data) {
-    // convert generic-signal event to named-signal event
-    var signal = new CustomEvent('iron-signal-' + name, {
-      // if signals bubble, it's easy to get confusing duplicates
-      // (1) listen on a container on behalf of local child
-      // (2) some deep child ignores the event and it bubbles
-      //     up to said container
-      // (3) local child event bubbles up to container
-      // also, for performance, we avoid signals flying up the
-      // tree from all over the place
-      bubbles: false,
-      detail: data
-    });
-    // dispatch named-signal to all 'signals' instances,
-    // only interested listeners will react
-    signals.forEach(function(s) {
-      s.dispatchEvent(signal);
-    });
-  }
-
-  // signal listener at document
-  document.addEventListener('iron-signal', function(e) {
-    notify(e.detail.name, e.detail.data);
-  });
-
-})();
-</script>
 <script>//! moment.js
 //! version : 2.12.0
 //! authors : Tim Wood, Iskren Chernev, Moment.js contributors
@@ -45782,6 +45792,7 @@ Polymer.PaperDatePickerItemBehavior = {
     <iron-ajax id="ajax" url="http://maps.googleapis.com/maps/api/geocode/json" params="{{computeLatLng(latitude, longitude)}}" handle-as="json" on-response="handleGetStreetAddress" debounce-duration="300">
     </iron-ajax>
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
+    <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <paper-dialog id="eventDialog" modal="">
       <section>
         <h2>Create Event</h2>
@@ -45859,6 +45870,9 @@ Polymer.PaperDatePickerItemBehavior = {
           value: function() {
             return this.next30(new Date().getTime());
           }
+        },
+        host: {
+          type: String
         }
       },
       
@@ -45871,7 +45885,7 @@ Polymer.PaperDatePickerItemBehavior = {
       },
       
       /**
-       * Disable login form's submit button when form is invalid
+       * Disable form's submit button when form is invalid
        */
       onFormChange: function () {
         this.$.createSubmit.disabled = !this.$.eventForm.validate();
@@ -45953,7 +45967,8 @@ Polymer.PaperDatePickerItemBehavior = {
             end: time,
             title: data.type,
             description: "",
-            host: "",
+            host: this.host,
+            guests: this.host,
             created: Firebase.ServerValue.TIMESTAMP
           });
           
@@ -45963,6 +45978,40 @@ Polymer.PaperDatePickerItemBehavior = {
           // close dialog
           this.$.eventDialog.close();
         }
+      },
+      
+      /**
+       * Returns the provider object for the user
+       *
+       */
+      userProvider: function (user) {
+        return user && user.provider && user[user.provider] ? user[user.provider] : {};
+      },
+      
+      /**
+       * Returns the users name
+       *
+       */
+      profileName: function(user) {
+        var p = this.userProvider(user);
+        return p.displayName ? p.displayName : '';
+      },
+      
+      /**
+       * Returns the users email
+       *
+       */
+      profileEmail: function(user) {
+        var p = this.userProvider(user);
+        return p.email ? p.email : '';
+      },
+      
+      /**
+       * Sets the default host based on the person logged in
+       *
+       */
+      handleLogin: function(event) {
+        this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
       },
       
       /**
@@ -46186,7 +46235,7 @@ Polymer.PaperDatePickerItemBehavior = {
         <paper-fab noink="" icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
-    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <dialog-event></dialog-event>
   </template>
@@ -46893,7 +46942,35 @@ Polymer.PaperDatePickerItemBehavior = {
     })();
   </script>
 </dom-module>
-<dom-module id="page-event" assetpath="page-event/">
+<script>
+    /**
+     * Copy the values of all enumerable own properties from one or more source objects to a target object. It will return the target object.
+     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+     */
+    if (typeof Object.assign != 'function') {
+      (function () {
+        Object.assign = function (target) {
+          'use strict';
+          if (target === undefined || target === null) {
+            throw new TypeError('Cannot convert undefined or null to object');
+          }
+    
+          var output = Object(target);
+          for (var index = 1; index < arguments.length; index++) {
+            var source = arguments[index];
+            if (source !== undefined && source !== null) {
+              for (var nextKey in source) {
+                if (source.hasOwnProperty(nextKey)) {
+                  output[nextKey] = source[nextKey];
+                }
+              }
+            }
+          }
+          return output;
+        };
+      })();
+    }
+</script><dom-module id="page-event" assetpath="page-event/">
   <style is="custom-style">
     h3 {
       text-align: center;
@@ -46921,7 +46998,7 @@ Polymer.PaperDatePickerItemBehavior = {
       z-index: 1;
     }
     .body-container {
-      margin: 260px 50px 50px 50px;
+      margin: 260px 20px 20px 20px;
     }
     .card-page {
       width: 100%;
@@ -46945,12 +47022,42 @@ Polymer.PaperDatePickerItemBehavior = {
       font-size: 12px;
       color: #636363;
     }
+    .back {
+      margin: 20px;
+      position: absolute;
+      top: 64px;
+      left: 0;
+      z-index: 1;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
+    .fab-event {
+      margin: 20px;
+      position: fixed;
+      bottom: 0;
+      right: 0;
+    }
+    
+    @media (max-width: 600px) {
+      .body-container {
+        margin: 260px 0 0 0;
+      }
+      .card-page {
+        width: 100%;
+        min-height: auto;
+      }
+    }
   </style>
   
     <template>
       <firebase-document location="{{eventLocation}}" data="{{event}}"></firebase-document>
       <google-map-search class="picker" map="[[map]]" query="[[event.location]]" results="{{results}}"></google-map-search>
       <section class="map-container">
+        <paper-button class="back" on-tap="handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
         <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui="" singleinfowindow="true" fittomarkers="true">
           <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
             <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
@@ -46963,30 +47070,35 @@ Polymer.PaperDatePickerItemBehavior = {
       <section class="body-container">
         <paper-card class="card-page">
           <div class="card-content">
-            <paper-input name="title" label="Title" required="" auto-validate="" error-message="Missing Title!" value="[[event.title]]"></paper-input>
-            <paper-typeahead-input input-value="{{event.location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required="" auto-validate="" error-message="Missing Location!"></paper-typeahead-input>
-            <paper-input name="start_time" value="[[event.start]]" label="Event Starts" hidden=""></paper-input>
-            <div>
-              <span class="fake-label">Event Starts</span>
-              <paper-datetime-picker-item icon="icons:today" date="[[event.start]]" iron-label-target=""></paper-datetime-picker-item>
-            </div>
-            <paper-input name="end_time" value="[[event.end]]" label="Event Ends" hidden=""></paper-input>
-            <div>
-              <span class="fake-label">Event Ends</span>
-              <paper-datetime-picker-item icon="icons:today" date="[[event.end]]" iron-label-target=""></paper-datetime-picker-item>
-            </div>
-            <paper-textarea name="description" label="Description" auto-validate="" error-message="Missing Description!" value="[[event.description]]"></paper-textarea>
-            <paper-input name="type" list="eventList" label="Type" required="" auto-validate="" error-message="Missing Type!" value="[[event.type]]"></paper-input>
-            <datalist id="eventList">
-              <option value="Birthday"></option>
-              <option value="Meeting"></option>
-              <option value="Hike"></option>
-              <option value="Hackathon"></option>
-            </datalist>
+            <form is="iron-form" id="editForm" action="/">
+              <paper-input name="title" label="Title" required="" auto-validate="" error-message="Missing Title!" value="{{eventClone.title::input}}"></paper-input>
+              <paper-typeahead-input input-value="{{eventClone.location}}" max-suggestions="3" local-candidates="{{computeCandidates(results)}}" placeholder="Location" required="" auto-validate="" error-message="Missing Location!"></paper-typeahead-input>
+              <paper-input name="start_time" value="[[eventClone.start]]" label="Event Starts" hidden=""></paper-input>
+              <div>
+                <span class="fake-label">Event Starts</span>
+                <paper-datetime-picker-item icon="icons:today" date="{{eventClone.start}}" iron-label-target=""></paper-datetime-picker-item>
+              </div>
+              <paper-input name="end_time" value="[[eventClone.end]]" label="Event Ends" hidden=""></paper-input>
+              <div>
+                <span class="fake-label">Event Ends</span>
+                <paper-datetime-picker-item icon="icons:today" date="{{eventClone.end}}" iron-label-target=""></paper-datetime-picker-item>
+              </div>
+              <paper-textarea name="description" label="Description (optional)" auto-validate="" error-message="Missing Description!" value="{{eventClone.description}}"></paper-textarea>
+              <paper-input name="type" list="eventList" label="Type" required="" auto-validate="" error-message="Missing Type!" value="{{eventClone.type}}"></paper-input>
+              <datalist id="eventList">
+                <option value="Birthday"></option>
+                <option value="Meeting"></option>
+                <option value="Hike"></option>
+                <option value="Hackathon"></option>
+              </datalist>
+              <paper-input name="host" label="Host" required="" auto-validate="" error-message="Missing Host!" value="{{eventClone.host}}"></paper-input>
+              <paper-textarea name="guests" label="Guest List" required="" auto-validate="" error-message="Missing Guests!" value="{{eventClone.guests}}"></paper-textarea>
+            </form>
           </div>
         <paper-card>
       </paper-card></paper-card></section>
-      <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+      <paper-fab id="editSubmit" noink="" icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
+      <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
   </template>
     
@@ -46995,8 +47107,7 @@ Polymer.PaperDatePickerItemBehavior = {
       is: 'page-event',
       properties: {
         key: {
-          type: String,
-          reflectToAttribute: true
+          type: String
         },
         eventLocation: {
           type: String
@@ -47005,6 +47116,10 @@ Polymer.PaperDatePickerItemBehavior = {
           type: Object
         },
         event: {
+          type: Object,
+          observer: 'computeEventClone'
+        },
+        eventClone: {
           type: Object
         },
         results: {
@@ -47026,6 +47141,22 @@ Polymer.PaperDatePickerItemBehavior = {
           value: null
         }
       },
+      
+      observers: [
+        'computeEventCloneValidate(eventClone.*)'
+      ],
+      
+      ready: function(){
+        this.$.editForm.addEventListener('input', this.onFormChange.bind(this));
+      },
+      
+      /**
+       * Disable form's submit button when form is invalid
+       */
+      onFormChange: function () {
+        this.$.editSubmit.disabled = !this.$.editForm.validate();
+      },
+      
       handleLogin: function(e) {
         this.uid = e.detail.user.uid;
         
@@ -47037,12 +47168,58 @@ Polymer.PaperDatePickerItemBehavior = {
         if(this.uid && this.key){
           this.eventLocation = 'https://u-swd-p1.firebaseio.com/events/' + this.uid + '/list/' + this.key;
         }
+        document.body.scrollTop = document.documentElement.scrollTop = 0;
       },
       
       handleLogout: function(e) {
         this.eventLocation = '';
-        this.key = undefined;
-        this.uid = undefined;
+        // this.key = undefined;
+        // this.uid = undefined;
+      },
+      
+      /**
+       * Returns user to the events page
+       *
+       */
+      handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      
+      /**
+       * Saves the form data if it's validated
+       *
+       */
+      handleSaveEvent: function() {
+        // convert times into milliseconds
+        this.eventClone.start = new Date(this.eventClone.start).getTime();
+        this.eventClone.end = new Date(this.eventClone.end).getTime();
+        if(this.$.editForm.validate()){
+          this.event = Object.assign({}, this.eventClone);
+        }
+      },
+      
+      /**
+       * Clone the event so form inputs can edit locally and revalidate the form
+       *
+       */
+      computeEventClone: function(event) {
+        this.set('eventClone', Object.assign({}, event));
+        this.onFormChange();
+      },
+      
+      /**
+       * Make sure the event dates stay within eachothers bounds
+       */
+      computeEventCloneValidate: function(record) {
+        if(record.path === 'eventClone.start' || record.path === 'eventClone.end'){
+          var start = new Date(record.base.start).getTime();
+          var end = new Date(record.base.end).getTime();
+          if(start > end){
+            this.set('eventClone.end', start);
+          }else if(end < start){
+            this.set('eventClone.start', end);
+          }
+        }
       },
       
       computeResults: function(r) {
@@ -47076,15 +47253,61 @@ Polymer.PaperDatePickerItemBehavior = {
     h3 {
       text-align: center;
     }
+    .body-container {
+      padding-bottom: 20px;
+      margin: 20px;
+    }
+    .logout {
+      background-color: var(--paper-indigo-500);
+      color: white;
+    }
+    .logout:hover {
+      background-color: var(--paper-indigo-400);
+    }
+    .back {
+      margin: 20px;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
+    .full {
+      width: 100%;
+    }
   </style>
   
   <template>
-    <h3>Profile Page</h3>
+    <section class="body-container">
+      <div>
+        <paper-button class="back" on-tap="_handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
+      </div>
+      <paper-card class="full">
+        <div class="card-content">
+          <paper-button class="logout" raised="" noink="" on-tap="_handleLogout">Logout</paper-button>
+        </div>
+      </paper-card>
+    </section>
   </template>
   
   <script>
     Polymer({
-      is: 'page-profile'
+      is: 'page-profile',
+      /**
+       * Returns user to the events page
+       *
+       */
+      _handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      /**
+       * Request to logout the user
+       *
+       */
+      _handleLogout: function() {
+        this.fire('iron-signal', {name: 'logout'});
+      }
     });
   </script>
 </dom-module><dom-module id="events-app" assetpath="events-app/">
@@ -47110,38 +47333,40 @@ Polymer.PaperDatePickerItemBehavior = {
     }
     
   </style>
-  <template>
-    <template is="dom-bind" id="app">
-      <carbon-location route="{{route}}"></carbon-location>
-      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
-      <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
-    
-      <app-drawer-layout force-narrow="" narrow="">
-        <app-drawer id="startDrawer" align="start">
-          <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-            <paper-item data-url="events">Events</paper-item>
-            <paper-item data-url="profile">Profile</paper-item>
-          </paper-menu>
-        </app-drawer>
-        <app-header-layout>
-          <app-header fixed="">
-            <app-toolbar>
-              <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
-              <div title="">Event Planner</div>
-              <profile-button></profile-button>
-            </app-toolbar>
-          </app-header>
-          <iron-pages attr-for-selected="data-url" selected="[[data.page]]">
-            <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
-            <page-events data-url="events"></page-events>
-            <page-profile data-url="profile"></page-profile>
-          </iron-pages>
-        </app-header-layout>
-      </app-drawer-layout>
-    </template>
+  
+  <template id="app">
+    <carbon-location route="{{route}}"></carbon-location>
+    <carbon-route-converter path="{{path}}" route="{{route}}" query-params="{{queryParams}}"></carbon-route-converter>
+    <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
+    <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
+    <app-drawer-layout force-narrow="" narrow="">
+      <app-drawer id="startDrawer" align="start">
+        <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
+          <paper-item data-url="events">Events</paper-item>
+          <paper-item data-url="profile">Profile</paper-item>
+        </paper-menu>
+      </app-drawer>
+      <app-header-layout>
+        <app-header fixed="">
+          <app-toolbar>
+            <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
+            <div title="">[[computeTitle(data.page)]]</div>
+            <profile-button></profile-button>
+          </app-toolbar>
+        </app-header>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
+          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="events"></page-events>
+          <page-profile data-url="profile"></page-profile>
+        </iron-pages>
+      </app-header-layout>
+    </app-drawer-layout>
+    <iron-signals on-iron-signal-logout-success="_handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-url="_handleURL"></iron-signals>
     <dialog-login></dialog-login>
     <dialog-register></dialog-register>
   </template>
+  
   <script>
     Polymer({
       is: 'events-app',
@@ -47150,25 +47375,66 @@ Polymer.PaperDatePickerItemBehavior = {
           type: Object
         },
         data: {
-          type: Object
+          type: Object,
+          value: function() {
+            return {};
+          }
         },
         subrouteData: {
           type: Object
         }
       },
+      listeners: {
+        'pages.iron-select': '_pageSelected'
+      },
       ready: function() {
         document.getElementById('skeleton').remove();
         Polymer.dom(this).removeAttribute('unresolved');
-        var pages = document.getElementById("pages");
-        if(pages){
-          pages.addEventListener('iron-select', this._itemSelected);
+      },
+      /**
+       * Properly set the page title
+       *
+       */
+      computeTitle: function(title) {
+        if(title){
+          if(title === 'event') {
+            return 'Event Details';
+          }
+          return title.charAt(0).toUpperCase() + title.slice(1);
         }
       },
-      _itemSelected: function(e) {
+      /**
+       * A page was selected from the iron-list
+       *
+       */
+      _pageSelected: function(e) {
         var page = e.detail.item;
         if(page.show){
-          page.show();
+          this.async(page.show.bind(page), 100);
         }
+      },
+      /**
+       * Changes the path if it's not already set to same value
+       * @param {String} path - URL path like '/events'
+       */
+      _setPath: function(path) {
+        if(this.path != path){
+          this.path = path;
+        }
+      },
+      /**
+       * The user logged out so put them on the events page
+       *
+       */
+      _handleLogout: function() {
+        this._setPath('/events');
+      },
+      /**
+       * Request to change the URL from app
+       *
+       */
+      _handleURL: function(e) {
+        this._setPath(e.detail);
       }
     });
   </script>

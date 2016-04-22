@@ -9,6 +9,7 @@
 <link rel="import" href="../../../bower_components/iron-form/iron-form.html">
 <link rel="import" href="../../../bower_components/iron-ajax/iron-ajax.html">
 <link rel="import" href="../../../bower_components/iron-label/iron-label.html">
+<link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
 <link rel="import" href="../../../bower_components/moment-element/moment-import.html">
 <link rel="import" href="../../../bower_components/google-map/google-map.html">
 <link rel="import" href="../../../bower_components/google-map/google-map-search.html">
@@ -88,6 +89,7 @@
       debounce-duration="300">
     </iron-ajax>
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
+    <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <paper-dialog id="eventDialog" modal>
       <section>
         <h2>Create Event</h2>
@@ -165,6 +167,9 @@
           value: function() {
             return this.next30(new Date().getTime());
           }
+        },
+        host: {
+          type: String
         }
       },
       
@@ -177,7 +182,7 @@
       },
       
       /**
-       * Disable login form's submit button when form is invalid
+       * Disable form's submit button when form is invalid
        */
       onFormChange: function () {
         this.$.createSubmit.disabled = !this.$.eventForm.validate();
@@ -259,7 +264,8 @@
             end: time,
             title: data.type,
             description: "",
-            host: "",
+            host: this.host,
+            guests: this.host,
             created: Firebase.ServerValue.TIMESTAMP
           });
           
@@ -269,6 +275,40 @@
           // close dialog
           this.$.eventDialog.close();
         }
+      },
+      
+      /**
+       * Returns the provider object for the user
+       *
+       */
+      userProvider: function (user) {
+        return user && user.provider && user[user.provider] ? user[user.provider] : {};
+      },
+      
+      /**
+       * Returns the users name
+       *
+       */
+      profileName: function(user) {
+        var p = this.userProvider(user);
+        return p.displayName ? p.displayName : '';
+      },
+      
+      /**
+       * Returns the users email
+       *
+       */
+      profileEmail: function(user) {
+        var p = this.userProvider(user);
+        return p.email ? p.email : '';
+      },
+      
+      /**
+       * Sets the default host based on the person logged in
+       *
+       */
+      handleLogin: function(event) {
+        this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
       },
       
       /**

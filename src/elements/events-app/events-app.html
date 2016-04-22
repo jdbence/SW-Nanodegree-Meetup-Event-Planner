@@ -2,12 +2,14 @@
 
 <link rel="import" href="../../../bower_components/carbon-route/carbon-route.html">
 <link rel="import" href="../../../bower_components/carbon-route/carbon-location.html">
+<link rel="import" href="../../../bower_components/carbon-route/carbon-route-converter.html">
 
 <link rel="import" href="../../../bower_components/app-layout/app-layout.html">
 <link rel="import" href="../../../bower_components/font-roboto/roboto.html">
 
 <link rel="import" href="../../../bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="../../../bower_components/iron-pages/iron-pages.html">
+<link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
 
 <link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/paper-header-panel/paper-header-panel.html">
@@ -47,38 +49,40 @@
     }
     
   </style>
-  <template>
-    <template is="dom-bind" id="app">
-      <carbon-location route={{route}}></carbon-location>
-      <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
-      <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
-    
-      <app-drawer-layout force-narrow narrow>
-        <app-drawer id="startDrawer" align="start" >
-          <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-            <paper-item data-url="events">Events</paper-item>
-            <paper-item data-url="profile">Profile</paper-item>
-          </paper-menu>
-        </app-drawer>
-        <app-header-layout>
-          <app-header fixed>
-            <app-toolbar>
-              <paper-icon-button icon="menu" class="narrow-only" drawer-toggle></paper-icon-button>
-              <div title>Event Planner</div>
-              <profile-button></profile-button>
-            </app-toolbar>
-          </app-header>
-          <iron-pages attr-for-selected="data-url" selected="[[data.page]]">
-            <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
-            <page-events data-url="events"></page-events>
-            <page-profile data-url="profile"></page-profile>
-          </iron-pages>
-        </app-header-layout>
-      </app-drawer-layout>
-    </template>
+  
+  <template id="app">
+    <carbon-location route={{route}}></carbon-location>
+    <carbon-route-converter path="{{path}}" route="{{route}}" query-params="{{queryParams}}"></carbon-route-converter>
+    <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
+    <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
+    <app-drawer-layout force-narrow narrow>
+      <app-drawer id="startDrawer" align="start" >
+        <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
+          <paper-item data-url="events">Events</paper-item>
+          <paper-item data-url="profile">Profile</paper-item>
+        </paper-menu>
+      </app-drawer>
+      <app-header-layout>
+        <app-header fixed>
+          <app-toolbar>
+            <paper-icon-button icon="menu" class="narrow-only" drawer-toggle></paper-icon-button>
+            <div title>[[computeTitle(data.page)]]</div>
+            <profile-button></profile-button>
+          </app-toolbar>
+        </app-header>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
+          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="events"></page-events>
+          <page-profile data-url="profile"></page-profile>
+        </iron-pages>
+      </app-header-layout>
+    </app-drawer-layout>
+    <iron-signals on-iron-signal-logout-success="_handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-url="_handleURL"></iron-signals>
     <dialog-login></dialog-login>
     <dialog-register></dialog-register>
   </template>
+  
   <script>
     Polymer({
       is: 'events-app',
@@ -87,25 +91,66 @@
           type: Object
         },
         data: {
-          type: Object
+          type: Object,
+          value: function() {
+            return {};
+          }
         },
         subrouteData: {
           type: Object
         }
       },
+      listeners: {
+        'pages.iron-select': '_pageSelected'
+      },
       ready: function() {
         document.getElementById('skeleton').remove();
         Polymer.dom(this).removeAttribute('unresolved');
-        var pages = document.getElementById("pages");
-        if(pages){
-          pages.addEventListener('iron-select', this._itemSelected);
+      },
+      /**
+       * Properly set the page title
+       *
+       */
+      computeTitle: function(title) {
+        if(title){
+          if(title === 'event') {
+            return 'Event Details';
+          }
+          return title.charAt(0).toUpperCase() + title.slice(1);
         }
       },
-      _itemSelected: function(e) {
+      /**
+       * A page was selected from the iron-list
+       *
+       */
+      _pageSelected: function(e) {
         var page = e.detail.item;
         if(page.show){
-          page.show();
+          this.async(page.show.bind(page), 100);
         }
+      },
+      /**
+       * Changes the path if it's not already set to same value
+       * @param {String} path - URL path like '/events'
+       */
+      _setPath: function(path) {
+        if(this.path != path){
+          this.path = path;
+        }
+      },
+      /**
+       * The user logged out so put them on the events page
+       *
+       */
+      _handleLogout: function() {
+        this._setPath('/events');
+      },
+      /**
+       * Request to change the URL from app
+       *
+       */
+      _handleURL: function(e) {
+        this._setPath(e.detail);
       }
     });
   </script>
