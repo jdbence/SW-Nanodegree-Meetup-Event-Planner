@@ -182,7 +182,7 @@
       },
       
       /**
-       * Disable login form's submit button when form is invalid
+       * Disable form's submit button when form is invalid
        */
       onFormChange: function () {
         this.$.createSubmit.disabled = !this.$.eventForm.validate();
@@ -265,7 +265,7 @@
             title: data.type,
             description: "",
             host: this.host,
-            guests: "",
+            guests: this.host,
             created: Firebase.ServerValue.TIMESTAMP
           });
           
