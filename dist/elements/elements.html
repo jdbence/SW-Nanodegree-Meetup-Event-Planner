@@ -25035,11 +25035,12 @@ of where they are in DOM.
   <template>
     <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" auto-login="" params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'anonymous')}}">
-      <paper-icon-button on-tap="login" icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
+      <paper-icon-button on-tap="_handleLogin" icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
     </template>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'google|password')}}">
-      <paper-icon-button on-tap="logout" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+      <paper-icon-button on-tap="showProfile" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
     </template>
+    <iron-signals on-iron-signal-logout="_handleLogout"></iron-signals>
   </template>
   
   <script>
@@ -25073,7 +25074,7 @@ of where they are in DOM.
        * Show login dialog
        *
        */
-      login: function() {
+      _handleLogin: function() {
         var dialog = document.getElementById('loginDialog');
         if (dialog) {
           dialog.open();
@@ -25084,12 +25085,20 @@ of where they are in DOM.
        * Request logout
        *
        */
-      logout: function() {
+      _handleLogout: function() {
         this.async(function(){
           this.provider = 'anonymous';
           this.$.firebaseLogin.logout();
         }, 1);
-        this.fire('iron-signal', {name: 'logout', data:null});
+        this.fire('iron-signal', {name: 'logout-success', data:null});
+      },
+      
+      /**
+       * Request to show the profile page
+       *
+       */
+      showProfile: function() {
+        this.fire('iron-signal', {name: 'url', data:'/profile'});
       },
       
       /**
@@ -25243,6 +25252,7 @@ of where they are in DOM.
           <paper-input name="name" label="Name" required="" auto-validate="" autofocus="" minlength="2" error-message="Atleast 2 characters"></paper-input>
           <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
+          <paper-input name="employer" label="Employer (optional)"></paper-input>
           <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
           <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
         </form>
@@ -46225,7 +46235,7 @@ Polymer.PaperDatePickerItemBehavior = {
         <paper-fab noink="" icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
-    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <dialog-event></dialog-event>
   </template>
@@ -46988,7 +46998,7 @@ Polymer.PaperDatePickerItemBehavior = {
       z-index: 1;
     }
     .body-container {
-      margin: 260px 50px 50px 50px;
+      margin: 260px 20px 20px 20px;
     }
     .card-page {
       width: 100%;
@@ -47012,7 +47022,19 @@ Polymer.PaperDatePickerItemBehavior = {
       font-size: 12px;
       color: #636363;
     }
-    
+    .back {
+      margin: 20px;
+      position: absolute;
+      top: 64px;
+      left: 0;
+      z-index: 1;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
     .fab-event {
       margin: 20px;
       position: fixed;
@@ -47035,6 +47057,7 @@ Polymer.PaperDatePickerItemBehavior = {
       <firebase-document location="{{eventLocation}}" data="{{event}}"></firebase-document>
       <google-map-search class="picker" map="[[map]]" query="[[event.location]]" results="{{results}}"></google-map-search>
       <section class="map-container">
+        <paper-button class="back" on-tap="handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
         <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui="" singleinfowindow="true" fittomarkers="true">
           <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
             <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
@@ -47075,7 +47098,7 @@ Polymer.PaperDatePickerItemBehavior = {
         <paper-card>
       </paper-card></paper-card></section>
       <paper-fab id="editSubmit" noink="" icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
-      <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+      <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
   </template>
     
@@ -47155,6 +47178,14 @@ Polymer.PaperDatePickerItemBehavior = {
       },
       
       /**
+       * Returns user to the events page
+       *
+       */
+      handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      
+      /**
        * Saves the form data if it's validated
        *
        */
@@ -47172,7 +47203,6 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       computeEventClone: function(event) {
-        //this.eventClone = Object.assign({}, event);
         this.set('eventClone', Object.assign({}, event));
         this.onFormChange();
       },
@@ -47223,15 +47253,61 @@ Polymer.PaperDatePickerItemBehavior = {
     h3 {
       text-align: center;
     }
+    .body-container {
+      padding-bottom: 20px;
+      margin: 20px;
+    }
+    .logout {
+      background-color: var(--paper-indigo-500);
+      color: white;
+    }
+    .logout:hover {
+      background-color: var(--paper-indigo-400);
+    }
+    .back {
+      margin: 20px;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
+    .full {
+      width: 100%;
+    }
   </style>
   
   <template>
-    <h3>Profile Page</h3>
+    <section class="body-container">
+      <div>
+        <paper-button class="back" on-tap="_handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
+      </div>
+      <paper-card class="full">
+        <div class="card-content">
+          <paper-button class="logout" raised="" noink="" on-tap="_handleLogout">Logout</paper-button>
+        </div>
+      </paper-card>
+    </section>
   </template>
   
   <script>
     Polymer({
-      is: 'page-profile'
+      is: 'page-profile',
+      /**
+       * Returns user to the events page
+       *
+       */
+      _handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      /**
+       * Request to logout the user
+       *
+       */
+      _handleLogout: function() {
+        this.fire('iron-signal', {name: 'logout'});
+      }
     });
   </script>
 </dom-module><dom-module id="events-app" assetpath="events-app/">
@@ -47260,6 +47336,7 @@ Polymer.PaperDatePickerItemBehavior = {
   
   <template id="app">
     <carbon-location route="{{route}}"></carbon-location>
+    <carbon-route-converter path="{{path}}" route="{{route}}" query-params="{{queryParams}}"></carbon-route-converter>
     <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
     <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
     <app-drawer-layout force-narrow="" narrow="">
@@ -47273,18 +47350,19 @@ Polymer.PaperDatePickerItemBehavior = {
         <app-header fixed="">
           <app-toolbar>
             <paper-icon-button icon="menu" class="narrow-only" drawer-toggle=""></paper-icon-button>
-            <div title="">Event Planner</div>
+            <div title="">[[computeTitle(data.page)]]</div>
             <profile-button></profile-button>
           </app-toolbar>
         </app-header>
-        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]">
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
           <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
           <page-events data-url="events"></page-events>
           <page-profile data-url="profile"></page-profile>
         </iron-pages>
       </app-header-layout>
     </app-drawer-layout>
-    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-logout-success="_handleLogout"></iron-signals>
+    <iron-signals on-iron-signal-url="_handleURL"></iron-signals>
     <dialog-login></dialog-login>
     <dialog-register></dialog-register>
   </template>
@@ -47307,23 +47385,56 @@ Polymer.PaperDatePickerItemBehavior = {
         }
       },
       listeners: {
-        'pages.iron-select': '_itemSelected'
+        'pages.iron-select': '_pageSelected'
       },
       ready: function() {
         document.getElementById('skeleton').remove();
         Polymer.dom(this).removeAttribute('unresolved');
       },
-      _itemSelected: function(e) {
+      /**
+       * Properly set the page title
+       *
+       */
+      computeTitle: function(title) {
+        if(title){
+          if(title === 'event') {
+            return 'Event Details';
+          }
+          return title.charAt(0).toUpperCase() + title.slice(1);
+        }
+      },
+      /**
+       * A page was selected from the iron-list
+       *
+       */
+      _pageSelected: function(e) {
         var page = e.detail.item;
         if(page.show){
           this.async(page.show.bind(page), 100);
         }
       },
-      handleLogout: function() {
-        // put user at events page on logout
-        if(this.data.page != 'events'){
-          window.location = '/events';
+      /**
+       * Changes the path if it's not already set to same value
+       * @param {String} path - URL path like '/events'
+       */
+      _setPath: function(path) {
+        if(this.path != path){
+          this.path = path;
         }
+      },
+      /**
+       * The user logged out so put them on the events page
+       *
+       */
+      _handleLogout: function() {
+        this._setPath('/events');
+      },
+      /**
+       * Request to change the URL from app
+       *
+       */
+      _handleURL: function(e) {
+        this._setPath(e.detail);
       }
     });
   </script>

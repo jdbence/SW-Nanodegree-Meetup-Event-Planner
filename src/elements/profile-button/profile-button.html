@@ -2,6 +2,7 @@
 <link rel="import" href="../../../bower_components/firebase-element/firebase-auth.html">
 <link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/iron-icons/social-icons.html">
+<link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
 
 <dom-module id="profile-button">
   <style is="custom-style">
@@ -19,11 +20,12 @@
   <template>
     <firebase-auth id="firebaseLogin" location="https://u-swd-p1.firebaseio.com" auto-login params="{{params}}" user="{{user}}" status-known="{{statusKnown}}" provider="{{provider}}" on-login="loginHandler"></firebase-auth>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'anonymous')}}">
-      <paper-icon-button on-tap="login"  icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
+      <paper-icon-button on-tap="_handleLogin"  icon="social:person-add" class="round" alt="Login" title="Login"></paper-icon-button>
     </template>
     <template is="dom-if" if="{{isLoggedIn(user, statusKnown, 'google|password')}}">
-      <paper-icon-button on-tap="logout" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
+      <paper-icon-button on-tap="showProfile" class="round loggedin" src="{{profileImage(user)}}" alt="{{profileName(user)}}" title="{{profileName(user)}}"></paper-icon-button>
     </template>
+    <iron-signals on-iron-signal-logout="_handleLogout"></iron-signals>
   </template>
   
   <script>
@@ -57,7 +59,7 @@
        * Show login dialog
        *
        */
-      login: function() {
+      _handleLogin: function() {
         var dialog = document.getElementById('loginDialog');
         if (dialog) {
           dialog.open();
@@ -68,12 +70,20 @@
        * Request logout
        *
        */
-      logout: function() {
+      _handleLogout: function() {
         this.async(function(){
           this.provider = 'anonymous';
           this.$.firebaseLogin.logout();
         }, 1);
-        this.fire('iron-signal', {name: 'logout', data:null});
+        this.fire('iron-signal', {name: 'logout-success', data:null});
+      },
+      
+      /**
+       * Request to show the profile page
+       *
+       */
+      showProfile: function() {
+        this.fire('iron-signal', {name: 'url', data:'/profile'});
       },
       
       /**

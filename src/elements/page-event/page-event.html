@@ -1,5 +1,6 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-input.html">
 <link rel="import" href="../../../bower_components/paper-input/paper-textarea.html">
 <link rel="import" href="../../../bower_components/paper-typeahead-input/paper-typeahead-input.html">
@@ -40,7 +41,7 @@
       z-index: 1;
     }
     .body-container {
-      margin: 260px 50px 50px 50px;
+      margin: 260px 20px 20px 20px;
     }
     .card-page {
       width: 100%;
@@ -64,7 +65,19 @@
       font-size: 12px;
       color: #636363;
     }
-    
+    .back {
+      margin: 20px;
+      position: absolute;
+      top: 64px;
+      left: 0;
+      z-index: 1;
+      color: #ff4081;
+      text-shadow: 0px 1px 1px #CA0000;
+    }
+    .back::shadow iron-icon {
+      -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
+      filter: drop-shadow(0px 2px 1px #CA0000);
+    }
     .fab-event {
       margin: 20px;
       position: fixed;
@@ -87,6 +100,7 @@
       <firebase-document location="{{eventLocation}}" data="{{event}}"></firebase-document>
       <google-map-search class="picker" map="[[map]]" query="[[event.location]]" results="{{results}}"></google-map-search>
       <section class="map-container">
+        <paper-button class="back" on-tap="handleEventsButton"><iron-icon icon="icons:arrow-back"></iron-icon> Events</paper-button>
         <google-map api-key="AIzaSyCR1zP4C808FtQ-Ljs1YOKpeVnG6tz40mM" map="{{map}}" latitude="[[latitude]]" longitude="[[longitude]]" zoom="13" disable-default-ui singleInfoWindow="true" fitToMarkers="true">
           <template is="dom-repeat" items="{{computeResults(results)}}" as="marker">
             <google-map-marker latitude="{{marker.latitude}}" longitude="{{marker.longitude}}">
@@ -127,7 +141,7 @@
         <paper-card>
       </section>
       <paper-fab id="editSubmit" noink icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
-      <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
+      <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
   </template>
     
@@ -207,6 +221,14 @@
       },
       
       /**
+       * Returns user to the events page
+       *
+       */
+      handleEventsButton: function() {
+        this.fire('iron-signal', {name: 'url', data:'/events'});
+      },
+      
+      /**
        * Saves the form data if it's validated
        *
        */
@@ -224,7 +246,6 @@
        *
        */
       computeEventClone: function(event) {
-        //this.eventClone = Object.assign({}, event);
         this.set('eventClone', Object.assign({}, event));
         this.onFormChange();
       },

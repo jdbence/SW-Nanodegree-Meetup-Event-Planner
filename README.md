@@ -12,6 +12,7 @@ SPA allows users to create new meetup events
 [browsersync]: https://www.browsersync.io
 [bower]: http://bower.io/
 [polymer]: https://www.polymer-project.org/1.0/
+[firebase]: https://www.firebase.com/
 [style-commit]: https://udacity.github.io/git-styleguide
 [style-js]: http://google.github.io/styleguide/javascriptguide.xml
 
@@ -19,7 +20,7 @@ SPA allows users to create new meetup events
 
 ## Includes
 
-[Gulp][gulp], [Bower][bower], [Browsersync][browsersync], [Polymer][polymer]
+[Gulp][gulp], [Bower][bower], [Browsersync][browsersync], [Polymer][polymer], [Firebase][firebase]
 
 ## Collaboration
 [Udacity Commit Styleguide][style-commit], [ESLint Google Styleguide][style-js]
@@ -30,7 +31,7 @@ SPA allows users to create new meetup events
 * Download as [zip][get-zip] or [tar.gz][get-tgz]
 * Checkout with [svn][clone-svn]
 
-### Gulp Dependencies
+### Dependencies
 
 ```node
 //  Install local dependencies
