@@ -47336,7 +47336,7 @@ Polymer.PaperDatePickerItemBehavior = {
   </style>
   
   <template id="app">
-    <carbon-location route="{{route}}"></carbon-location>
+    <carbon-location route="{{route}}" use-hash-as-path=""></carbon-location>
     <carbon-route-converter path="{{path}}" route="{{route}}" query-params="{{queryParams}}"></carbon-route-converter>
     <carbon-route route="{{route}}" pattern="/:page" data="{{data}}" tail="{{subroute}}"></carbon-route>
     <carbon-route route="{{subroute}}" pattern="/:key" data="{{subrouteData}}"></carbon-route>
@@ -47398,6 +47398,7 @@ Polymer.PaperDatePickerItemBehavior = {
        */
       computeTitle: function(title) {
         if(title){
+          title = title.replace('/* @echo BASE_URL */', '');
           if(title === 'event') {
             return 'Event Details';
           }
