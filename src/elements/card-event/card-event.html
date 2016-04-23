@@ -72,9 +72,7 @@
           <div>{{event.location}}</div>
         </div>
         <div class="card-actions">
-          <a href$="/<!-- @echo BASE_URL -->event/[[key]]" tabindex="-1">
-            <paper-button>Details</paper-button>
-          </a>
+          <paper-button data-url$="/<!-- @echo BASE_URL -->event/[[key]]" on-tap="detailHandler">Details</paper-button>
         </div>
       </div>
       
@@ -93,6 +91,9 @@
           token:''
         },
         key: ''
+      },
+      detailHandler: function(e) {
+        this.fire('iron-signal', {name: 'url', data: e.target.getAttribute('data-url')});
       }
     });
   </script>
