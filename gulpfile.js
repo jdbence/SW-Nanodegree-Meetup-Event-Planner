@@ -8,20 +8,29 @@ var gulp = require('gulp'),
   sourcemaps = require('gulp-sourcemaps'),
   vulcanize = require('gulp-vulcanize'),
   preprocess = require('gulp-preprocess'),
+  sequence = require('gulp-sequence'),
   browserSync = require('browser-sync'),
   reload = browserSync.reload,
   history = require('connect-history-api-fallback'),
   del = require('del'),
   config = require('./config');
+  
+var processVariables = config.production;
 
 // builds html and styles
-gulp.task('default', ['html', 'vulcanize', 'styles', 'lint', 'scripts:prod']);
+gulp.task('default', sequence('html', 'vulcanize', 'styles', 'lint', 'scripts:prod'));
 
 // builds for github page
-gulp.task('github', ['html:github', 'vulcanize', 'styles', 'lint', 'scripts:prod']);
+gulp.task('build:github', sequence('process:github', 'html', 'vulcanize', 'styles', 'lint', 'scripts:prod'));
 
 // lint JS files when attempting to commit changes to git
 gulp.task('pre-commit', ['lint']);
+
+// set as github process variables
+gulp.task('process:github', function (cb) {
+  processVariables = config.github;
+  cb();
+});
 
 // lint JS files
 gulp.task('lint', function () {
@@ -39,13 +48,7 @@ gulp.task('lint', function () {
 // copy html to dist folder
 gulp.task('html', function () {
   return gulp.src(config.src + '/*.html')
-    .pipe(preprocess({context: { BASE_URL: '/'}}))
-    .pipe(gulp.dest(config.dist));
-});
-
-gulp.task('html:github', function () {
-  return gulp.src(config.src + '/*.html')
-    .pipe(preprocess({context: { BASE_URL: '/SW-Nanodegree-Meetup-Event-Planner/dist/'}}))
+    .pipe(preprocess(processVariables))
     .pipe(gulp.dest(config.dist));
 });
 
@@ -65,6 +68,7 @@ gulp.task('styles', function () {
 // concats JS files
 gulp.task('scripts', function () {
   return gulp.src(config.src + '/js/**/*.js')
+    .pipe(preprocess(processVariables))
     .pipe(sourcemaps.init())
     .pipe(bable())
     .pipe(concat('all.js'))
@@ -75,6 +79,7 @@ gulp.task('scripts', function () {
 // concats and minifies JS files
 gulp.task('scripts:prod', function () {
   return gulp.src(config.src + '/js/**/*.js')
+    .pipe(preprocess(processVariables))
     .pipe(bable())
     .pipe(concat('all.js'))
     .pipe(uglify())
@@ -101,9 +106,19 @@ gulp.task('live', function () {
     middleware: [history()]
   });
   // changes in src should recompile and reload
-  gulp.watch(config.src + '/**/*.html', ['html', 'vulcanize', reload]);
-  gulp.watch(config.src + '/js/**/*.js', ['lint', 'scripts', reload]);
-  gulp.watch(config.src + '/styles/**/*.scss', ['styles', reload]);
+  gulp.watch(config.src + '/**/*.html', ['reload-html']);
+  gulp.watch(config.src + '/js/**/*.js', ['reload-js']);
+  gulp.watch(config.src + '/styles/**/*.scss', ['styles'], reload);
+});
+
+// run html tasks in sequence and then reload browser
+gulp.task("reload-html", function (cb) {
+  sequence('html', 'vulcanize', reload)(cb);
+});
+
+// run js tasks in sequence and then reload browser
+gulp.task("reload-js", function (cb) {
+  sequence('lint', 'scripts', reload)(cb);
 });
 
 // scrape all Polymer elements
@@ -114,7 +129,8 @@ gulp.task('vulcanize', function() {
       inlineCss: true,
       inlineScripts: true
     }))
-    .pipe(gulp.dest(config.dist + '/elements'))
+    .pipe(preprocess(processVariables))
+    .pipe(gulp.dest(config.dist + '/elements'));
 });
 
 // removes all files from the dist folder
