@@ -7,6 +7,7 @@ var gulp = require('gulp'),
   bable = require('gulp-babel'),
   sourcemaps = require('gulp-sourcemaps'),
   vulcanize = require('gulp-vulcanize'),
+  preprocess = require('gulp-preprocess'),
   browserSync = require('browser-sync'),
   reload = browserSync.reload,
   history = require('connect-history-api-fallback'),
@@ -15,6 +16,9 @@ var gulp = require('gulp'),
 
 // builds html and styles
 gulp.task('default', ['html', 'vulcanize', 'styles', 'lint', 'scripts:prod']);
+
+// builds for github page
+gulp.task('github', ['html:github', 'vulcanize', 'styles', 'lint', 'scripts:prod']);
 
 // lint JS files when attempting to commit changes to git
 gulp.task('pre-commit', ['lint']);
@@ -35,6 +39,13 @@ gulp.task('lint', function () {
 // copy html to dist folder
 gulp.task('html', function () {
   return gulp.src(config.src + '/*.html')
+    .pipe(preprocess({context: { BASE_URL: '/'}}))
+    .pipe(gulp.dest(config.dist));
+});
+
+gulp.task('html:github', function () {
+  return gulp.src(config.src + '/*.html')
+    .pipe(preprocess({context: { BASE_URL: '/SW-Nanodegree-Meetup-Event-Planner/dist/'}}))
     .pipe(gulp.dest(config.dist));
 });
 
