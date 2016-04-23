@@ -1,6 +1,7 @@
 class App {
   name = 'Super Awesome App!';
   _app = null;
+  baseURL = '/* @echo BASE_URL */' || '';
   
   constructor() {
     this._app = document.querySelector('#app');
@@ -36,4 +37,4 @@ class App {
   }
 }
 
-new App();
+window.app = new App();

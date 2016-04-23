@@ -58,8 +58,8 @@
     <app-drawer-layout force-narrow narrow>
       <app-drawer id="startDrawer" align="start" >
         <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-          <paper-item data-url="events">Events</paper-item>
-          <paper-item data-url="profile">Profile</paper-item>
+          <paper-item data-url="<!-- @echo BASE_URL -->events">Events</paper-item>
+          <paper-item data-url="<!-- @echo BASE_URL -->profile">Profile</paper-item>
         </paper-menu>
       </app-drawer>
       <app-header-layout>
@@ -70,10 +70,10 @@
             <profile-button></profile-button>
           </app-toolbar>
         </app-header>
-        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
-          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
-          <page-events data-url="events"></page-events>
-          <page-profile data-url="profile"></page-profile>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="<!-- @echo BASE_URL -->events">
+          <page-event data-url="<!-- @echo BASE_URL -->event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="<!-- @echo BASE_URL -->events"></page-events>
+          <page-profile data-url="<!-- @echo BASE_URL -->profile"></page-profile>
         </iron-pages>
       </app-header-layout>
     </app-drawer-layout>
@@ -118,6 +118,7 @@
           }
           return title.charAt(0).toUpperCase() + title.slice(1);
         }
+        return '';
       },
       /**
        * A page was selected from the iron-list

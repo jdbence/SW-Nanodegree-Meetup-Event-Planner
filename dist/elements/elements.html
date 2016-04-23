@@ -47342,8 +47342,8 @@ Polymer.PaperDatePickerItemBehavior = {
     <app-drawer-layout force-narrow="" narrow="">
       <app-drawer id="startDrawer" align="start">
         <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-          <paper-item data-url="events">Events</paper-item>
-          <paper-item data-url="profile">Profile</paper-item>
+          <paper-item data-url="SW-Nanodegree-Meetup-Event-Planner/dist/events">Events</paper-item>
+          <paper-item data-url="SW-Nanodegree-Meetup-Event-Planner/dist/profile">Profile</paper-item>
         </paper-menu>
       </app-drawer>
       <app-header-layout>
@@ -47354,10 +47354,10 @@ Polymer.PaperDatePickerItemBehavior = {
             <profile-button></profile-button>
           </app-toolbar>
         </app-header>
-        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
-          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
-          <page-events data-url="events"></page-events>
-          <page-profile data-url="profile"></page-profile>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="SW-Nanodegree-Meetup-Event-Planner/dist/events">
+          <page-event data-url="SW-Nanodegree-Meetup-Event-Planner/dist/event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="SW-Nanodegree-Meetup-Event-Planner/dist/events"></page-events>
+          <page-profile data-url="SW-Nanodegree-Meetup-Event-Planner/dist/profile"></page-profile>
         </iron-pages>
       </app-header-layout>
     </app-drawer-layout>
@@ -47402,6 +47402,7 @@ Polymer.PaperDatePickerItemBehavior = {
           }
           return title.charAt(0).toUpperCase() + title.slice(1);
         }
+        return '';
       },
       /**
        * A page was selected from the iron-list
