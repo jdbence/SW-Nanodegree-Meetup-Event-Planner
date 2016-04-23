@@ -46130,7 +46130,7 @@ Polymer.PaperDatePickerItemBehavior = {
           <div>{{event.location}}</div>
         </div>
         <div class="card-actions">
-          <a href$="/event/[[key]]" tabindex="-1">
+          <a href$="/SW-Nanodegree-Meetup-Event-Planner/dist/event/[[key]]" tabindex="-1">
             <paper-button>Details</paper-button>
           </a>
         </div>
@@ -47299,7 +47299,7 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       _handleEventsButton: function() {
-        this.fire('iron-signal', {name: 'url', data:'/events'});
+        this.fire('iron-signal', {name: 'url', data:'/SW-Nanodegree-Meetup-Event-Planner/dist/events'});
       },
       /**
        * Request to logout the user
@@ -47428,7 +47428,7 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       _handleLogout: function() {
-        this._setPath('/events');
+        this._setPath('/SW-Nanodegree-Meetup-Event-Planner/dist/events');
       },
       /**
        * Request to change the URL from app
