@@ -45,6 +45,8 @@ npm install && bower install
 gulp live
 // Build dist version
 gulp
+// Build github dist version (live preview)
+gulp build:github
 // Empties dist folder
 gulp clean
 ```
