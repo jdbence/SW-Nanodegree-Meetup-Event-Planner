@@ -25098,7 +25098,7 @@ of where they are in DOM.
        *
        */
       showProfile: function() {
-        this.fire('iron-signal', {name: 'url', data:'/SW-Nanodegree-Meetup-Event-Planner/dist/profile'});
+        this.fire('iron-signal', {name: 'url', data:'/profile'});
       },
       
       /**
@@ -46130,7 +46130,7 @@ Polymer.PaperDatePickerItemBehavior = {
           <div>{{event.location}}</div>
         </div>
         <div class="card-actions">
-          <paper-button data-url$="/SW-Nanodegree-Meetup-Event-Planner/dist/event/[[key]]" on-tap="detailHandler">Details</paper-button>
+          <paper-button data-url$="/event/[[key]]" on-tap="detailHandler">Details</paper-button>
         </div>
       </div>
       
@@ -47183,7 +47183,7 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       handleEventsButton: function() {
-        this.fire('iron-signal', {name: 'url', data:'/SW-Nanodegree-Meetup-Event-Planner/dist/events'});
+        this.fire('iron-signal', {name: 'url', data:'/events'});
       },
       
       /**
@@ -47300,7 +47300,7 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       _handleEventsButton: function() {
-        this.fire('iron-signal', {name: 'url', data:'/SW-Nanodegree-Meetup-Event-Planner/dist/events'});
+        this.fire('iron-signal', {name: 'url', data:'/events'});
       },
       /**
        * Request to logout the user
@@ -47343,8 +47343,8 @@ Polymer.PaperDatePickerItemBehavior = {
     <app-drawer-layout force-narrow="" narrow="">
       <app-drawer id="startDrawer" align="start">
         <paper-menu attr-for-selected="data-url" selected="{{data.page}}">
-          <paper-item data-url="SW-Nanodegree-Meetup-Event-Planner/dist/events">Events</paper-item>
-          <paper-item data-url="SW-Nanodegree-Meetup-Event-Planner/dist/profile">Profile</paper-item>
+          <paper-item data-url="events">Events</paper-item>
+          <paper-item data-url="profile">Profile</paper-item>
         </paper-menu>
       </app-drawer>
       <app-header-layout>
@@ -47355,10 +47355,10 @@ Polymer.PaperDatePickerItemBehavior = {
             <profile-button></profile-button>
           </app-toolbar>
         </app-header>
-        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="SW-Nanodegree-Meetup-Event-Planner/dist/events">
-          <page-event data-url="SW-Nanodegree-Meetup-Event-Planner/dist/event" key="[[subrouteData.key]]"></page-event>
-          <page-events data-url="SW-Nanodegree-Meetup-Event-Planner/dist/events"></page-events>
-          <page-profile data-url="SW-Nanodegree-Meetup-Event-Planner/dist/profile"></page-profile>
+        <iron-pages id="pages" attr-for-selected="data-url" selected="[[data.page]]" fallback-selection="events">
+          <page-event data-url="event" key="[[subrouteData.key]]"></page-event>
+          <page-events data-url="events"></page-events>
+          <page-profile data-url="profile"></page-profile>
         </iron-pages>
       </app-header-layout>
     </app-drawer-layout>
@@ -47430,7 +47430,7 @@ Polymer.PaperDatePickerItemBehavior = {
        *
        */
       _handleLogout: function() {
-        this._setPath('/SW-Nanodegree-Meetup-Event-Planner/dist/events');
+        this._setPath('/events');
       },
       /**
        * Request to change the URL from app
