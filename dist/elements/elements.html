@@ -45789,7 +45789,7 @@ Polymer.PaperDatePickerItemBehavior = {
     }
   </style>
   <template>
-    <iron-ajax id="ajax" url="http://maps.googleapis.com/maps/api/geocode/json" params="{{computeLatLng(latitude, longitude)}}" handle-as="json" on-response="handleGetStreetAddress" debounce-duration="300">
+    <iron-ajax id="ajax" url="https://maps.googleapis.com/maps/api/geocode/json" params="{{computeLatLng(latitude, longitude)}}" handle-as="json" on-response="handleGetStreetAddress" debounce-duration="300">
     </iron-ajax>
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
