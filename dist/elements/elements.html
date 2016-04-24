@@ -19591,6 +19591,7 @@ value. `setMax` should move the slider to the maximum value.
       },
       
       listeners: {
+        'iron-overlay-opened': 'onDialogOpened',
         'iron-overlay-closed': 'onDialogClosed',
         'iron-form-invalid': 'onInputChange'
       },
@@ -19616,6 +19617,15 @@ value. `setMax` should move the slider to the maximum value.
       },
       
       /**
+       * Auto select the first input
+       *
+       */
+      onDialogOpened: function() {
+        var input = event.target.querySelector('[autofocus]');
+        input.$.input.focus();
+      },
+      
+      /**
        * Hide any error messages
        *
        */
@@ -19629,7 +19639,7 @@ value. `setMax` should move the slider to the maximum value.
        */
       loginPassword: function() {
         this.provider = 'password';
-        this.$.firebaseLogin.login(this.$.loginForm.serialize())
+        this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
       
       /**
@@ -25298,6 +25308,7 @@ of where they are in DOM.
       },
       
       listeners: {
+        'iron-overlay-opened': 'onDialogOpened',
         'iron-overlay-closed': 'onDialogClosed',
         'iron-form-invalid': 'onInputChange'
       },
@@ -25320,6 +25331,15 @@ of where they are in DOM.
        */
       computeLayout: function(mobile) {
         return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Auto select the first input
+       *
+       */
+      onDialogOpened: function() {
+        var input = event.target.querySelector('[autofocus]');
+        input.$.input.focus();
       },
       
       /**
