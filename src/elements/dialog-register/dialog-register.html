@@ -15,6 +15,7 @@
 <link rel="import" href="../../../bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="../../../bower_components/gold-email-input/gold-email-input.html">
 <link rel="import" href="../../../bower_components/google-signin/google-icons.html">
+<link rel="import" href="../password-input/password-input.html">
 
 <dom-module id="dialog-register">
   <style is="custom-style" include="iron-flex iron-flex-alignment">
@@ -129,9 +130,9 @@
       <div class$="{{computeLayout(mobile)}}">
         <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="createUser"></iron-a11y-keys>
         <form is="iron-form" id="registerForm" action="/">
-          <paper-input name="name" label="Name" required auto-validate autoFocus minLength="2" error-message="Atleast 2 characters"></paper-input>
+          <paper-input name="name" label="Name" required auto-validate autofocus minLength="2" error-message="Atleast 2 characters"></paper-input>
           <gold-email-input name="email" required auto-validate autocomplete error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
-          <paper-input name="password" type="password" label="Password" required auto-validate minLength="5" error-message="Invalid Password"></paper-input>
+          <password-input name="password" label="Password" required auto-validate numeric lowercase uppercase min-length="7"></password-input>
           <paper-input name="employer" label="Employer (optional)"></paper-input>
           <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
           <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
@@ -183,7 +184,7 @@
         'iron-form-invalid': 'onInputChange'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.registerForm.addEventListener('input', this.onInputChange.bind(this));
       },
       
@@ -199,24 +200,33 @@
        * Returns the layout classes depending on mobile/desktop
        *
        */
-      computeLayout: function(mobile) {
+      computeLayout: function (mobile) {
         return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Dialog has opened
+       *
+       */
+      onDialogOpened: function (event) {
+        this.inputFocus(event.target.querySelector('[autofocus]'));
       },
       
       /**
        * Auto select the first input
        *
        */
-      onDialogOpened: function() {
-        var input = event.target.querySelector('[autofocus]');
-        input.$.input.focus();
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
        * Hide any error messages
        *
        */
-      onDialogClosed: function() {
+      onDialogClosed: function () {
         this.$.collapse.hide();
       },
       
@@ -224,7 +234,7 @@
        * Request Google SSO
        *
        */
-      registerGoogle: function(e) {
+      registerGoogle: function (e) {
         this.provider = 'google';
         this.$.firebaseRegister.login();
       },
@@ -233,7 +243,7 @@
        * Something went wrong with the Firebase request
        *
        */
-      errorHandler: function(e) {
+      errorHandler: function (e) {
         this.message = e.detail.message;
         this.$.collapse.show();
       },
@@ -251,7 +261,7 @@
        * Login the user after the account is created
        *
        */
-      userCreatedHandler: function(e) {
+      userCreatedHandler: function (e) {
         this.provider = 'password';
         this.$.firebaseRegister.login(this.$.registerForm.serialize());
         this.$.registerDialog.close();
@@ -261,7 +271,7 @@
        * Open the login dialog
        *
        */
-      accountLogin: function() {
+      accountLogin: function () {
         this.$.registerDialog.close();
         var dialog = document.getElementById('loginDialog');
         if (dialog) {

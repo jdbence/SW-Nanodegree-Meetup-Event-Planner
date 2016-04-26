@@ -7,6 +7,7 @@
 <link rel="import" href="../../../bower_components/paper-card/paper-card.html">
 <link rel="import" href="../../../bower_components/paper-listbox/paper-listbox.html">
 <link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../../../bower_components/paper-toast/paper-toast.html">
 <link rel="import" href="../../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
 <link rel="import" href="../../../bower_components/iron-signals/iron-signals.html">
@@ -20,6 +21,9 @@
     }
     paper-input {
       padding-bottom: 10px;
+    }
+    paper-toast {
+      min-width: 200px;
     }
     google-map {
       margin-top: 64px;
@@ -73,6 +77,11 @@
       z-index: 1;
       color: #ff4081;
       text-shadow: 0px 1px 1px #CA0000;
+      background-color: white;
+      background-color: rgba(255, 255, 255, 0.7);
+    }
+    .back:hover {
+      background-color: white;
     }
     .back::shadow iron-icon {
       -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
@@ -140,6 +149,7 @@
           </div>
         <paper-card>
       </section>
+      <paper-toast id="saveEventToast" text="Event Saved!"></paper-toast>
       <paper-fab id="editSubmit" noink icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
       <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
@@ -238,6 +248,7 @@
         this.eventClone.end = new Date(this.eventClone.end).getTime();
         if(this.$.editForm.validate()){
           this.event = Object.assign({}, this.eventClone);
+          this.$.saveEventToast.open();
         }
       },
       

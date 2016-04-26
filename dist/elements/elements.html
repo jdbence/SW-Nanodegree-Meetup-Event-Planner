@@ -19584,7 +19584,7 @@ value. `setMax` should move the slider to the maximum value.
         
         form: {
           type: Object,
-          value: function() {
+          value: function () {
             return this.$.loginForm;
           }
         }
@@ -19596,7 +19596,7 @@ value. `setMax` should move the slider to the maximum value.
         'iron-form-invalid': 'onInputChange'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.loginForm.addEventListener('input', this.onInputChange.bind(this));
       },
       
@@ -19612,24 +19612,33 @@ value. `setMax` should move the slider to the maximum value.
        * Returns the layout classes depending on mobile/desktop
        *
        */
-      computeLayout: function(mobile) {
+      computeLayout: function (mobile) {
         return 'layout inner ' + (mobile ? '' : 'horizontal');
+      },
+      
+      /**
+       * Dialog has opened
+       *
+       */
+      onDialogOpened: function (event) {
+        this.inputFocus(event.target.querySelector('[autofocus]'));
       },
       
       /**
        * Auto select the first input
        *
        */
-      onDialogOpened: function() {
-        var input = event.target.querySelector('[autofocus]');
-        input.$.input.focus();
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
        * Hide any error messages
        *
        */
-      onDialogClosed: function() {
+      onDialogClosed: function () {
         this.$.collapse.hide();
       },
       
@@ -19637,7 +19646,7 @@ value. `setMax` should move the slider to the maximum value.
        * Request password login
        *
        */
-      loginPassword: function() {
+      loginPassword: function () {
         this.provider = 'password';
         this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
@@ -19646,7 +19655,7 @@ value. `setMax` should move the slider to the maximum value.
        * Request Google SSO
        *
        */
-      loginGoogle: function(e) {
+      loginGoogle: function (e) {
         this.provider = 'google';
         this.$.firebaseLogin.login();
       },
@@ -19655,7 +19664,7 @@ value. `setMax` should move the slider to the maximum value.
        * Something went wrong with the Firebase request
        *
        */
-      errorHandler: function(e) {
+      errorHandler: function (e) {
         this.message = e.detail.message;
         this.$.collapse.show();
       },
@@ -19664,7 +19673,7 @@ value. `setMax` should move the slider to the maximum value.
        * Open the registration dialog
        *
        */
-      createAccount: function() {
+      createAccount: function () {
         this.$.loginDialog.close();
         
         var dialog = document.getElementById('registerDialog');
@@ -25146,6 +25155,598 @@ of where they are in DOM.
       }
     });
   </script>
+</dom-module><script>
+
+ /**
+ * `iron-range-behavior` provides the behavior for something with a minimum to maximum range.
+ *
+ * @demo demo/index.html
+ * @polymerBehavior
+ */
+ Polymer.IronRangeBehavior = {
+
+  properties: {
+
+    /**
+     * The number that represents the current value.
+     */
+    value: {
+      type: Number,
+      value: 0,
+      notify: true,
+      reflectToAttribute: true
+    },
+
+    /**
+     * The number that indicates the minimum value of the range.
+     */
+    min: {
+      type: Number,
+      value: 0,
+      notify: true
+    },
+
+    /**
+     * The number that indicates the maximum value of the range.
+     */
+    max: {
+      type: Number,
+      value: 100,
+      notify: true
+    },
+
+    /**
+     * Specifies the value granularity of the range's value.
+     */
+    step: {
+      type: Number,
+      value: 1,
+      notify: true
+    },
+
+    /**
+     * Returns the ratio of the value.
+     */
+    ratio: {
+      type: Number,
+      value: 0,
+      readOnly: true,
+      notify: true
+    },
+  },
+
+  observers: [
+    '_update(value, min, max, step)'
+  ],
+
+  _calcRatio: function(value) {
+    return (this._clampValue(value) - this.min) / (this.max - this.min);
+  },
+
+  _clampValue: function(value) {
+    return Math.min(this.max, Math.max(this.min, this._calcStep(value)));
+  },
+
+  _calcStep: function(value) {
+   /**
+    * if we calculate the step using
+    * `Math.round(value / step) * step` we may hit a precision point issue
+    * eg. 0.1 * 0.2 =  0.020000000000000004
+    * http://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html
+    *
+    * as a work around we can divide by the reciprocal of `step`
+    */
+    // polymer/issues/2493
+    value = parseFloat(value);
+    return this.step ? (Math.round((value + this.min) / this.step) -
+        (this.min / this.step)) / (1 / this.step) : value;
+  },
+
+  _validateValue: function() {
+    var v = this._clampValue(this.value);
+    this.value = this.oldValue = isNaN(v) ? this.oldValue : v;
+    return this.value !== v;
+  },
+
+  _update: function() {
+    this._validateValue();
+    this._setRatio(this._calcRatio(this.value) * 100);
+  }
+
+};
+</script>
+
+
+<dom-module id="paper-progress" assetpath="../../bower_components/paper-progress/">
+  <template>
+    <style>
+      :host {
+        display: block;
+        width: 200px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      #progressContainer {
+        position: relative;
+      }
+
+      #progressContainer,
+      /* the stripe for the indeterminate animation*/
+      .indeterminate::after {
+        height: var(--paper-progress-height, 4px);
+      }
+
+      #primaryProgress,
+      #secondaryProgress,
+      .indeterminate::after {
+        @apply(--layout-fit);
+      }
+
+      #progressContainer,
+      .indeterminate::after {
+        background: var(--paper-progress-container-color, --google-grey-300);
+      }
+
+      :host(.transiting) #primaryProgress,
+      :host(.transiting) #secondaryProgress {
+        -webkit-transition-property: -webkit-transform;
+        transition-property: transform;
+
+        /* Duration */
+        -webkit-transition-duration: var(--paper-progress-transition-duration, 0.08s);
+        transition-duration: var(--paper-progress-transition-duration, 0.08s);
+
+        /* Timing function */
+        -webkit-transition-timing-function: var(--paper-progress-transition-timing-function, ease);
+        transition-timing-function: var(--paper-progress-transition-timing-function, ease);
+
+        /* Delay */
+        -webkit-transition-delay: var(--paper-progress-transition-delay, 0s);
+        transition-delay: var(--paper-progress-transition-delay, 0s);
+      }
+
+      #primaryProgress,
+      #secondaryProgress {
+        @apply(--layout-fit);
+        -webkit-transform-origin: left center;
+        transform-origin: left center;
+        -webkit-transform: scaleX(0);
+        transform: scaleX(0);
+        will-change: transform;
+      }
+
+      #primaryProgress {
+        background: var(--paper-progress-active-color, --google-green-500);
+      }
+
+      #secondaryProgress {
+        background: var(--paper-progress-secondary-color, --google-green-100);
+      }
+
+      :host([disabled]) #primaryProgress {
+        background: var(--paper-progress-disabled-active-color, --google-grey-500);
+      }
+
+      :host([disabled]) #secondaryProgress {
+        background: var(--paper-progress-disabled-secondary-color, --google-grey-300);
+      }
+
+      :host(:not([disabled])) #primaryProgress.indeterminate {
+        -webkit-transform-origin: right center;
+        transform-origin: right center;
+        -webkit-animation: indeterminate-bar 2s linear infinite;
+        animation: indeterminate-bar 2s linear infinite;
+      }
+
+      :host(:not([disabled])) #primaryProgress.indeterminate::after {
+        content: "";
+        -webkit-transform-origin: center center;
+        transform-origin: center center;
+
+        -webkit-animation: indeterminate-splitter 2s linear infinite;
+        animation: indeterminate-splitter 2s linear infinite;
+      }
+
+      @-webkit-keyframes indeterminate-bar {
+        0% {
+          -webkit-transform: scaleX(1) translateX(-100%);
+        }
+        50% {
+          -webkit-transform: scaleX(1) translateX(0%);
+        }
+        75% {
+          -webkit-transform: scaleX(1) translateX(0%);
+          -webkit-animation-timing-function: cubic-bezier(.28,.62,.37,.91);
+        }
+        100% {
+          -webkit-transform: scaleX(0) translateX(0%);
+        }
+      }
+
+      @-webkit-keyframes indeterminate-splitter {
+        0% {
+          -webkit-transform: scaleX(.75) translateX(-125%);
+        }
+        30% {
+          -webkit-transform: scaleX(.75) translateX(-125%);
+          -webkit-animation-timing-function: cubic-bezier(.42,0,.6,.8);
+        }
+        90% {
+          -webkit-transform: scaleX(.75) translateX(125%);
+        }
+        100% {
+          -webkit-transform: scaleX(.75) translateX(125%);
+        }
+      }
+
+      @keyframes indeterminate-bar {
+        0% {
+          transform: scaleX(1) translateX(-100%);
+        }
+        50% {
+          transform: scaleX(1) translateX(0%);
+        }
+        75% {
+          transform: scaleX(1) translateX(0%);
+          animation-timing-function: cubic-bezier(.28,.62,.37,.91);
+        }
+        100% {
+          transform: scaleX(0) translateX(0%);
+        }
+      }
+
+      @keyframes indeterminate-splitter {
+        0% {
+          transform: scaleX(.75) translateX(-125%);
+        }
+        30% {
+          transform: scaleX(.75) translateX(-125%);
+          animation-timing-function: cubic-bezier(.42,0,.6,.8);
+        }
+        90% {
+          transform: scaleX(.75) translateX(125%);
+        }
+        100% {
+          transform: scaleX(.75) translateX(125%);
+        }
+      }
+    </style>
+
+    <div id="progressContainer">
+      <div id="secondaryProgress" hidden$="[[_hideSecondaryProgress(secondaryRatio)]]"></div>
+      <div id="primaryProgress"></div>
+    </div>
+  </template>
+</dom-module>
+
+<script>
+  Polymer({
+    is: 'paper-progress',
+
+    behaviors: [
+      Polymer.IronRangeBehavior
+    ],
+
+    properties: {
+      /**
+       * The number that represents the current secondary progress.
+       */
+      secondaryProgress: {
+        type: Number,
+        value: 0
+      },
+
+      /**
+       * The secondary ratio
+       */
+      secondaryRatio: {
+        type: Number,
+        value: 0,
+        readOnly: true
+      },
+
+      /**
+       * Use an indeterminate progress indicator.
+       */
+      indeterminate: {
+        type: Boolean,
+        value: false,
+        observer: '_toggleIndeterminate'
+      },
+
+      /**
+       * True if the progress is disabled.
+       */
+      disabled: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+        observer: '_disabledChanged'
+      }
+    },
+
+    observers: [
+      '_progressChanged(secondaryProgress, value, min, max)'
+    ],
+
+    hostAttributes: {
+      role: 'progressbar'
+    },
+
+    _toggleIndeterminate: function(indeterminate) {
+      // If we use attribute/class binding, the animation sometimes doesn't translate properly
+      // on Safari 7.1. So instead, we toggle the class here in the update method.
+      this.toggleClass('indeterminate', indeterminate, this.$.primaryProgress);
+    },
+
+    _transformProgress: function(progress, ratio) {
+      var transform = 'scaleX(' + (ratio / 100) + ')';
+      progress.style.transform = progress.style.webkitTransform = transform;
+    },
+
+    _mainRatioChanged: function(ratio) {
+      this._transformProgress(this.$.primaryProgress, ratio);
+    },
+
+    _progressChanged: function(secondaryProgress, value, min, max) {
+      secondaryProgress = this._clampValue(secondaryProgress);
+      value = this._clampValue(value);
+
+      var secondaryRatio = this._calcRatio(secondaryProgress) * 100;
+      var mainRatio = this._calcRatio(value) * 100;
+
+      this._setSecondaryRatio(secondaryRatio);
+      this._transformProgress(this.$.secondaryProgress, secondaryRatio);
+      this._transformProgress(this.$.primaryProgress, mainRatio);
+
+      this.secondaryProgress = secondaryProgress;
+
+      this.setAttribute('aria-valuenow', value);
+      this.setAttribute('aria-valuemin', min);
+      this.setAttribute('aria-valuemax', max);
+    },
+
+    _disabledChanged: function(disabled) {
+      this.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    },
+
+    _hideSecondaryProgress: function(secondaryRatio) {
+      return secondaryRatio === 0;
+    }
+  });
+</script>
+<script>
+
+  /**
+   * Use `Polymer.IronValidatorBehavior` to implement a custom input/form validator. Element
+   * instances implementing this behavior will be registered for use in elements that implement
+   * `Polymer.IronValidatableBehavior`.
+   * 
+   * @demo demo/index.html
+   * @polymerBehavior
+   */
+  Polymer.IronValidatorBehavior = {
+
+    properties: {
+
+      /**
+       * Namespace for this validator.
+       */
+      validatorType: {
+        type: String,
+        value: 'validator'
+      },
+
+      /**
+       * Name for this validator, used by `Polymer.IronValidatableBehavior` to lookup this element.
+       */
+      validatorName: {
+        type: String,
+        value: function() {
+          return this.is;
+        }
+      }
+
+    },
+
+    ready: function() {
+      new Polymer.IronMeta({type: this.validatorType, key: this.validatorName, value: this});
+    },
+
+    /**
+     * Implement custom validation logic in this function.
+     * @param {Object} values The value to validate. May be any type depending on the validation logic.
+     * @return {Boolean} true if `values` is valid.
+     */
+    validate: function(values) {
+    }
+  };
+
+</script>
+<dom-module id="password-validator" assetpath="password-input/">
+  
+  <script>
+    Polymer({
+      is: 'password-validator',
+      
+      behaviors: [
+        Polymer.IronValidatorBehavior
+      ],
+  
+      properties: {
+        regex: {
+          type: String,
+          value: '.*'
+        },
+        acceptance: {
+          type: Number,
+          value: 80
+        },
+        strength: {
+          type: Number,
+          value: 0,
+          notify: true
+        },
+        error: {
+          type: String,
+          value: '',
+          notify: true
+        },
+        minLength: {
+          type: Number,
+          value: 8
+        },
+        numeric: Boolean,
+        lowercase: Boolean,
+        uppercase: Boolean,
+        validatorName: 'password-validator'
+      },
+      
+      validate: function (value) {
+        this.strength = this._strength(value);
+        return this.strength >= this.acceptance;
+      },
+      
+      _strength: function (value) {
+        var total = 0;
+        var matches = 0;
+        var err = '';
+          
+        if(this.minLength) {
+          total++;
+          if(value.length >= this.minLength){
+            matches++;
+          }else{
+            err = "Requires atleas " + this.minLength + " characters";
+          }
+        }
+        
+        if(this.numeric) {
+          total++;
+          if(this._validate(value, '(?=.*[0-9])')){
+            matches++;
+          }else{
+            err = "Requires atleast 1 number";
+          }
+        }
+        
+        if(this.lowercase) {
+          total++;
+          if(this._validate(value, '(?=.*[a-z])')){
+            matches++;
+          }else{
+            err = "Requires atleast 1 lowercase";
+          }
+        }
+        
+        if(this.uppercase) {
+          total++;
+          if(this._validate(value, '(?=.*[A-Z])')){
+            matches++;
+          }else{
+            err = "Requires atleast 1 uppercase";
+          }
+        }
+        
+        this.error = err;
+        
+        if(matches > 0){
+          return Math.max(0, Math.min(100, ((matches / total) * 100)));
+        }
+        return this.total > 0 ? 0 : 100;
+      },
+      
+      _validate: function(value, pattern) {
+        var exp = new RegExp('^' + pattern);
+        return !value || (value.match(exp) !== null);
+      }
+    });
+  </script>
+</dom-module><dom-module id="password-input" assetpath="password-input/">
+  <style is="custom-style">
+    paper-progress {
+      width: 100%;
+      padding-bottom: 8px;
+      --paper-progress-height: 2px;
+      --paper-progress-container-color: var(--paper-red-500);
+      --paper-progress-active-color: var(--paper-light-green-500);
+      --paper-progress-secondary-color: var(--paper-light-green-100);
+    }
+    
+    paper-input {
+      --paper-input-container: {
+        padding-bottom: 0px;
+      };
+      --paper-input-container-underline: {
+        display: none;
+      };
+      --paper-input-container-underline-focus: {
+        display: none;
+      }
+      --paper-input-container-underline-disabled: {
+        display: none;
+      }
+    }
+    
+  </style>
+  
+  <template>
+    <password-validator strength="{{strength}}" error="{{error}}" uppercase$="{{uppercase}}" lowercase$="{{lowercase}}" numeric$="{{numeric}}" min-length$="{{minLength}}"></password-validator>
+    <paper-input id="input" autofocus$="[[autofocus]]" auto-validate$="[[autoValidate]]" disabled$="[[disabled]]" error-message="{{error}}" label$="{{label}}" name$="{{name}}" required$="[[required]]" type="password" value$="{{value}}" validator="password-validator"></paper-input>
+    <paper-progress value="{{strength}}"></paper-progress>
+  </template>
+  
+  <script>
+    Polymer({
+      is: 'password-input',
+  
+      properties: {
+        error: {
+          type: String,
+          value: ''
+        },
+        strength: {
+          type: Number,
+          value: 0
+        },
+        value: {
+          type: String,
+          value: ''
+        }
+      },
+      
+      /**
+       * The password element has been added
+       *
+       */
+      ready: function () {
+        this.$.input.addEventListener('input', this._onInputChanged.bind(this));
+        this.async(function(){
+          this._handleEmptyInput(this.value);
+        });
+      },
+      
+      /**
+       * The input has changed
+       *
+       */
+      _onInputChanged: function(e) {
+        this._handleEmptyInput(e.currentTarget.value);
+      },
+      
+      /**
+       * When input is blank display missing password error
+       *
+       */
+      _handleEmptyInput: function(value) {
+        if(!value || value === ""){
+          this.strength = 0;
+          this.error = "Missing Password!";
+        }
+      }
+    });
+  </script>
 </dom-module><dom-module id="dialog-register" assetpath="dialog-register/">
   <style is="custom-style" include="iron-flex iron-flex-alignment">
     iron-collapse {
@@ -25261,7 +25862,7 @@ of where they are in DOM.
         <form is="iron-form" id="registerForm" action="/">
           <paper-input name="name" label="Name" required="" auto-validate="" autofocus="" minlength="2" error-message="Atleast 2 characters"></paper-input>
           <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
-          <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
+          <password-input name="password" label="Password" required="" auto-validate="" numeric="" lowercase="" uppercase="" min-length="7"></password-input>
           <paper-input name="employer" label="Employer (optional)"></paper-input>
           <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
           <paper-button on-tap="accountLogin" class="link">Have account?</paper-button>
@@ -25313,7 +25914,7 @@ of where they are in DOM.
         'iron-form-invalid': 'onInputChange'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.registerForm.addEventListener('input', this.onInputChange.bind(this));
       },
       
@@ -25329,24 +25930,33 @@ of where they are in DOM.
        * Returns the layout classes depending on mobile/desktop
        *
        */
-      computeLayout: function(mobile) {
+      computeLayout: function (mobile) {
         return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Dialog has opened
+       *
+       */
+      onDialogOpened: function (event) {
+        this.inputFocus(event.target.querySelector('[autofocus]'));
       },
       
       /**
        * Auto select the first input
        *
        */
-      onDialogOpened: function() {
-        var input = event.target.querySelector('[autofocus]');
-        input.$.input.focus();
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
        * Hide any error messages
        *
        */
-      onDialogClosed: function() {
+      onDialogClosed: function () {
         this.$.collapse.hide();
       },
       
@@ -25354,7 +25964,7 @@ of where they are in DOM.
        * Request Google SSO
        *
        */
-      registerGoogle: function(e) {
+      registerGoogle: function (e) {
         this.provider = 'google';
         this.$.firebaseRegister.login();
       },
@@ -25363,7 +25973,7 @@ of where they are in DOM.
        * Something went wrong with the Firebase request
        *
        */
-      errorHandler: function(e) {
+      errorHandler: function (e) {
         this.message = e.detail.message;
         this.$.collapse.show();
       },
@@ -25381,7 +25991,7 @@ of where they are in DOM.
        * Login the user after the account is created
        *
        */
-      userCreatedHandler: function(e) {
+      userCreatedHandler: function (e) {
         this.provider = 'password';
         this.$.firebaseRegister.login(this.$.registerForm.serialize());
         this.$.registerDialog.close();
@@ -25391,7 +26001,7 @@ of where they are in DOM.
        * Open the login dialog
        *
        */
-      accountLogin: function() {
+      accountLogin: function () {
         this.$.registerDialog.close();
         var dialog = document.getElementById('loginDialog');
         if (dialog) {
@@ -26284,6 +26894,258 @@ of where they are in DOM.
         return (icon.length > 0) || (src.length > 0);
       }
     });
+  </script>
+</dom-module>
+
+
+<dom-module id="paper-toast" assetpath="../../bower_components/paper-toast/">
+  <template>
+    <style>
+      :host {
+        display: block;
+        position: fixed;
+        background-color: var(--paper-toast-background-color, #323232);
+        color: var(--paper-toast-color, #f1f1f1);
+        min-height: 48px;
+        min-width: 288px;
+        padding: 16px 24px;
+        box-sizing: border-box;
+        box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
+        border-radius: 2px;
+        left: 0;
+        bottom: 0;
+        margin: 12px;
+        font-size: 14px;
+        cursor: default;
+        -webkit-transition: -webkit-transform 0.3s, opacity 0.3s;
+        transition: transform 0.3s, opacity 0.3s;
+        opacity: 0;
+        -webkit-transform: translateY(100px);
+        transform: translateY(100px);
+        @apply(--paper-font-common-base);
+      }
+
+      :host(.capsule) {
+        border-radius: 24px;
+      }
+
+      :host(.fit-bottom) {
+        width: 100%;
+        min-width: 0;
+        border-radius: 0;
+        margin: 0;
+      }
+
+      :host(.paper-toast-open) {
+        opacity: 1;
+        -webkit-transform: translateY(0px);
+        transform: translateY(0px);
+      }
+    </style>
+
+    <span id="label">{{text}}</span>
+    <content></content>
+  </template>
+
+  <script>
+    (function() {
+      // Keeps track of the toast currently opened.
+      var currentToast = null;
+
+      Polymer({
+        is: 'paper-toast',
+
+        behaviors: [
+          Polymer.IronOverlayBehavior
+        ],
+
+        properties: {
+          /**
+           * The duration in milliseconds to show the toast.
+           * Set to `0`, a negative number, or `Infinity`, to disable the
+           * toast auto-closing.
+           */
+          duration: {
+            type: Number,
+            value: 3000
+          },
+
+          /**
+           * The text to display in the toast.
+           */
+          text: {
+            type: String,
+            value: ''
+          },
+
+          /**
+           * Overridden from `IronOverlayBehavior`.
+           * Set to false to enable closing of the toast by clicking outside it.
+           */
+          noCancelOnOutsideClick: {
+            type: Boolean,
+            value: true
+          },
+
+          /**
+           * Overridden from `IronOverlayBehavior`.
+           * Set to true to disable auto-focusing the toast or child nodes with
+           * the `autofocus` attribute` when the overlay is opened.
+           */
+          noAutoFocus: {
+            type: Boolean,
+            value: true
+          }
+        },
+
+        listeners: {
+          'transitionend': '__onTransitionEnd'
+        },
+
+        /**
+         * Read-only. Deprecated. Use `opened` from `IronOverlayBehavior`.
+         * @property visible
+         * @deprecated
+         */
+        get visible() {
+          console.warn('`visible` is deprecated, use `opened` instead');
+          return this.opened;
+        },
+
+        /**
+         * Read-only. Can auto-close if duration is a positive finite number.
+         * @property _canAutoClose
+         */
+        get _canAutoClose() {
+          return this.duration > 0 && this.duration !== Infinity;
+        },
+
+        created: function() {
+          this._autoClose = null;
+          Polymer.IronA11yAnnouncer.requestAvailability();
+        },
+
+        /**
+         * Show the toast. Without arguments, this is the same as `open()` from `IronOverlayBehavior`.
+         * @param {(Object|string)=} properties Properties to be set before opening the toast.
+         * e.g. `toast.show('hello')` or `toast.show({text: 'hello', duration: 3000})`
+         */
+        show: function(properties) {
+          if (typeof properties == 'string') {
+            properties = { text: properties };
+          }
+          for (var property in properties) {
+            if (property.indexOf('_') === 0) {
+              console.warn('The property "' + property + '" is private and was not set.');
+            } else if (property in this) {
+              this[property] = properties[property];
+            } else {
+              console.warn('The property "' + property + '" is not valid.');
+            }
+          }
+          this.open();
+        },
+
+        /**
+         * Hide the toast. Same as `close()` from `IronOverlayBehavior`.
+         */
+        hide: function() {
+          this.close();
+        },
+
+        /**
+         * Overridden from `IronFitBehavior`.
+         * Positions the toast at the bottom left of fitInto.
+         */
+        center: function () {
+          if (this.fitInto === window) {
+            this.style.bottom = this.style.left = '';
+          } else {
+            var rect = this.fitInto.getBoundingClientRect();
+            this.style.left = rect.left + 'px';
+            this.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+          }
+        },
+
+        /**
+         * Called on transitions of the toast, indicating a finished animation
+         * @private
+         */
+        __onTransitionEnd: function(e) {
+          // there are different transitions that are happening when opening and
+          // closing the toast. The last one so far is for `opacity`.
+          // This marks the end of the transition, so we check for this to determine if this
+          // is the correct event.
+          if (e && e.target === this && e.propertyName === 'opacity') {
+            if (this.opened) {
+              this._finishRenderOpened();
+            } else {
+              this._finishRenderClosed();
+            }
+          }
+        },
+
+        /**
+         * Overridden from `IronOverlayBehavior`.
+         * Called when the value of `opened` changes.
+         */
+        _openedChanged: function() {
+          if (this._autoClose !== null) {
+            this.cancelAsync(this._autoClose);
+            this._autoClose = null;
+          }
+          if (this.opened) {
+            if (currentToast && currentToast !== this) {
+              currentToast.close();
+            }
+            currentToast = this;
+            this.fire('iron-announce', {
+              text: this.text
+            });
+            if (this._canAutoClose) {
+              this._autoClose = this.async(this.close, this.duration);
+            }
+          } else if (currentToast === this) {
+            currentToast = null;
+          }
+          Polymer.IronOverlayBehaviorImpl._openedChanged.apply(this, arguments);
+        },
+
+        /**
+         * Overridden from `IronOverlayBehavior`.
+         */
+        _renderOpened: function() {
+          this.classList.add('paper-toast-open');
+        },
+
+        /**
+         * Overridden from `IronOverlayBehavior`.
+         */
+        _renderClosed: function() {
+          this.classList.remove('paper-toast-open');
+        },
+
+        /**
+         * Overridden from `IronOverlayBehavior`.
+         * iron-fit-behavior will set the inline style position: static, which
+         * causes the toast to be rendered incorrectly when opened by default.
+         */
+        _onIronResize: function() {
+          Polymer.IronOverlayBehaviorImpl._onIronResize.apply(this, arguments);
+          if (this.opened) {
+            // Make sure there is no inline style for position.
+            this.style.position = '';
+          }
+        }
+
+        /**
+         * Fired when `paper-toast` is opened.
+         *
+         * @event 'iron-announce'
+         * @param {{text: string}} detail Contains text that will be announced.
+         */
+      });
+    })();
   </script>
 </dom-module>
 
@@ -29059,7 +29921,9 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         datetime: {
           type: String,
-          value: new Date().getTime()
+          value: function() {
+            return new Date().getTime();
+          }
         },
 
         /**
@@ -29068,7 +29932,7 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         inputFormat: {
           type: String,
-          value: null
+          value: ''
         },
 
         /**
@@ -29077,7 +29941,7 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         outputFormat: {
           type: String,
-          value: null
+          value: ''
         },
 
         /**
@@ -29086,7 +29950,7 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         from: {
           type: String,
-          value: null
+          value: ''
         },
 
         /**
@@ -29095,7 +29959,7 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         to: {
           type: String,
-          value: null
+          value: ''
         },
 
         /**
@@ -29103,30 +29967,18 @@ return a[this.day()]},sameElse:"L"},relativeTime:{future:"за %s",past:"пре 
          */
         output: {
           type: String,
-          computed: 'computeOutput(datetime, inputFormat, outputFormat, from, to)'
+          computed: '_computeOutput(datetime, inputFormat, outputFormat, from, to)'
         }
       },
-
-      _initializeMoment: function() {
-        var output = moment(this.datetime, this.inputFormat);
-        return this.outputFormat ? output.format(this.outputFormat) : output;
-      },
-
-      _getFrom: function(from, output) {
-        return from === 'now' ? output.fromNow() : output.from(moment(from));
-      },
-
-      _getTo: function(to, output) {
-        return to === 'now' ? output.toNow() : output.to(moment(to));
-      },
       
-      computeOutput: function(datetime, inputFormat, outputFormat, from, to) {
-        var output = this._initializeMoment();
-
-        if (from) {
-          output = this._getFrom(from, output);
+      _computeOutput: function(datetime, inputFormat, outputFormat, from, to) {
+        var output = inputFormat ? moment(datetime, inputFormat) : moment(datetime);
+        if (outputFormat) {
+          output = output.format(outputFormat);
+        } else if (from) {
+          output = from === 'now' ? output.fromNow() : output.from(moment(from));
         } else if (to) {
-          output = this._getTo(to, output);
+          output = to === 'now' ? output.toNow() : output.to(moment(to));
         }
         return output;
       }
@@ -45747,6 +46599,17 @@ Polymer.PaperDatePickerItemBehavior = {
 </script><dom-module id="dialog-event" assetpath="dialog-event/">
   
   <style is="custom-style" include="iron-flex iron-flex-alignment">
+  
+    paper-toolbar.pop {
+      --paper-toolbar-color: black;
+      --paper-toolbar-background: transparent;
+      --paper-toolbar-title: {
+        margin: 0 !important;
+      };
+      margin: 0;
+      padding: 0;
+    }
+    
     paper-dialog {
       max-width: 100%;
       width: 600px;
@@ -45756,7 +46619,9 @@ Polymer.PaperDatePickerItemBehavior = {
     }
     
     paper-dialog section {
+      margin-top: 0;
       width: 100%;
+      overflow-x: hidden;
       overflow-y: auto;
       @apply(--layout-flex);
     }
@@ -45796,7 +46661,8 @@ Polymer.PaperDatePickerItemBehavior = {
       }
     }
     .map-container {
-      position:relative;
+      position: relative;
+      width: 100%;
     }
     .map-container:before {
       content: "";
@@ -45814,8 +46680,11 @@ Polymer.PaperDatePickerItemBehavior = {
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <paper-dialog id="eventDialog" modal="">
+      <paper-toolbar class="pop">
+        <span class="title">Create Event</span>
+        <paper-icon-button icon="close" title="close" dialog-dismiss=""></paper-icon-button>
+      </paper-toolbar>
       <section>
-        <h2>Create Event</h2>
         <form is="iron-form" id="eventForm" action="/">
           <paper-input name="type" list="eventList" label="Type" required="" autofocus="" auto-validate="" error-message="Missing Type!"></paper-input>
           <datalist id="eventList">
@@ -45844,8 +46713,8 @@ Polymer.PaperDatePickerItemBehavior = {
         </form>
       </section>
       <div class="buttons">
-        <paper-button dialog-dismiss="">Cancel</paper-button>
-        <paper-button on-tap="handleCreate" id="createSubmit">Create</paper-button>
+        <paper-button on-tap="handleCreate" id="createSubmit" title="Create Event">Create</paper-button>
+        <paper-button on-tap="handleEdit" id="editSubmit" title="Edit Event Details">Edit</paper-button>
       </div>
     </paper-dialog>
   </template>
@@ -45881,13 +46750,13 @@ Polymer.PaperDatePickerItemBehavior = {
         },
         form: {
           type: Object,
-          value: function() {
+          value: function () {
             return this.$.eventForm;
           }
         },
         today: {
           type: String,
-          value: function() {
+          value: function () {
             return this.next30(new Date().getTime());
           }
         },
@@ -45897,10 +46766,10 @@ Polymer.PaperDatePickerItemBehavior = {
       },
       
       listeners: {
-        'iron-overlay-opened': 'handleDialogOpen'
+        'iron-overlay-opened': 'onDialogOpened'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.eventForm.addEventListener('input', this.onFormChange.bind(this));
       },
       
@@ -45908,15 +46777,29 @@ Polymer.PaperDatePickerItemBehavior = {
        * Disable form's submit button when form is invalid
        */
       onFormChange: function () {
-        this.$.createSubmit.disabled = !this.$.eventForm.validate();
+        var valid = !this.$.eventForm.validate();
+        this.$.createSubmit.disabled = valid;
+        this.$.editSubmit.disabled = valid;
       },
       
       /**
-       * Whenever the form is opened update the values
+       * Dialog has opened
+       *
        */
-      handleDialogOpen: function() {
+      onDialogOpened: function (event) {
         this.getLocation();
         this.onFormChange();
+        this.inputFocus(event.target.querySelector('[autofocus]'));
+      },
+      
+      /**
+       * Auto select the first input
+       *
+       */
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
@@ -45934,7 +46817,7 @@ Polymer.PaperDatePickerItemBehavior = {
        * @param {Array} results - Array of Location objects from Google API
        * @returns {Array} - Array of address objects
        */
-      computeResults: function(results) {
+      computeResults: function (results) {
         if(results.length > 0) {
           var loc = results[0];
           this.latitude = loc.latitude;
@@ -45948,7 +46831,7 @@ Polymer.PaperDatePickerItemBehavior = {
        * @param {Array} results - Array of Location objects from Google API
        * @returns {Array} - Array of address strings
        */
-      computeCandidates: function(results) {
+      computeCandidates: function (results) {
         var t = Math.min(results.length, 3);
         var candidates = [];
         var i;
@@ -45963,7 +46846,7 @@ Polymer.PaperDatePickerItemBehavior = {
        * @param {Object} option - Location object from Google API
        * @returns {String} - address of the location
        */
-      computeLocationName: function(option) {
+      computeLocationName: function (option) {
         if(option.formatted_address.indexOf(option.name) != -1) {
           return option.formatted_address;
         }
@@ -45973,13 +46856,42 @@ Polymer.PaperDatePickerItemBehavior = {
       /**
        * Creates a new event if the form is valid
        */
-      handleCreate: function() {
+      handleCreate: function () {
         if(this.$.eventForm.validate()){
-          var data = this.$.eventForm.serialize();
-          var time = new Date(data.start_time).getTime();
           
-          // request to create the event
-          this.fire('create', {
+          this.createEvent(this.$.eventForm.serialize(), false);
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
+        }
+      },
+      
+      /**
+       * Allows the user to advance edit the event
+       *
+       */
+      handleEdit: function () {
+        if(this.$.eventForm.validate()){
+          
+          this.createEvent(this.$.eventForm.serialize(), true);
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
+        }
+      },
+      
+      createEvent: function (data, open) {
+        var time = new Date(data.start_time).getTime();
+          
+        // request to create the event
+        this.fire('create', {
+          event: {
             //TODO: use name prop after typehead supports property passthrough
             location: this.location, //data.location,
             type: data.type,
@@ -45990,14 +46902,9 @@ Polymer.PaperDatePickerItemBehavior = {
             host: this.host,
             guests: this.host,
             created: Firebase.ServerValue.TIMESTAMP
-          });
-          
-          // reset form defaults
-          this.$.eventForm.reset();
-          
-          // close dialog
-          this.$.eventDialog.close();
-        }
+          },
+          open: open || false
+        });
       },
       
       /**
@@ -46012,7 +46919,7 @@ Polymer.PaperDatePickerItemBehavior = {
        * Returns the users name
        *
        */
-      profileName: function(user) {
+      profileName: function (user) {
         var p = this.userProvider(user);
         return p.displayName ? p.displayName : '';
       },
@@ -46021,7 +46928,7 @@ Polymer.PaperDatePickerItemBehavior = {
        * Returns the users email
        *
        */
-      profileEmail: function(user) {
+      profileEmail: function (user) {
         var p = this.userProvider(user);
         return p.email ? p.email : '';
       },
@@ -46030,16 +46937,16 @@ Polymer.PaperDatePickerItemBehavior = {
        * Sets the default host based on the person logged in
        *
        */
-      handleLogin: function(event) {
+      handleLogin: function (event) {
         this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
       },
       
       /**
        * Attempts to get the lat/long information from the navigator and location from Google API
        */
-      getLocation: function() {
+      getLocation: function () {
         if (navigator && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(function(position) {
+          navigator.geolocation.getCurrentPosition(function (position) {
             var point = position.coords;
             this.latitude = point.latitude;
             this.longitude = point.longitude;
@@ -46052,9 +46959,9 @@ Polymer.PaperDatePickerItemBehavior = {
        * Google API returns the address location about the lat/long
        * @param {Event} event - AJAX reponse from Google API
        */
-      handleGetStreetAddress: function(event) {
+      handleGetStreetAddress: function (event) {
         var results = (event.detail && event.detail.response && event.detail.response.results) ? event.detail.response.results : [];
-        var matched = _.find(results, function(o) { return o.types.indexOf('street_address') >= 0 });
+        var matched = _.find(results, function (o) { return o.types.indexOf('street_address') >= 0 });
         if(matched){
           this.location = matched.formatted_address;
         }
@@ -46066,11 +46973,11 @@ Polymer.PaperDatePickerItemBehavior = {
        * @param {String} type - Expect reponse as 'millisecond' or 'moment'
        * @returns {Number|Moment} - time rounded to the next 30 minutes
        */
-      next30: function(time, type){
+      next30: function (time, type){
       	type = type || 'millisecond';
         var m = moment(time);
         var seconds = m.seconds();
-        var minutes = m.minute()
+        var minutes = m.minute();
         minutes = minutes >= 30 ? 60 - minutes : 30 - minutes;
         m.add(minutes, 'minutes').subtract(seconds, 'seconds');
         
@@ -46201,6 +47108,10 @@ Polymer.PaperDatePickerItemBehavior = {
     paper-card {
       width: 100%;
     }
+    paper-toast {
+      min-width: 200px;
+    }
+    
     .fab-event {
       margin: 20px;
       position: fixed;
@@ -46256,7 +47167,8 @@ Polymer.PaperDatePickerItemBehavior = {
         <paper-fab noink="" icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
-    <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
+    <paper-toast id="createEventToast" text="Event Created!"></paper-toast>
+    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <dialog-event></dialog-event>
   </template>
@@ -46324,7 +47236,14 @@ Polymer.PaperDatePickerItemBehavior = {
        */
       handleCreateEvent: function(e) {
         if(e.detail) {
-          this.$.eventCollection.add(e.detail);
+          var query = this.$.eventCollection.add(e.detail.event);
+          // auto open the event page
+          if (e.detail.open) {
+            var key = query.path.u[3];
+            this.fire('iron-signal', {name: 'url', data: '/event/' + key});
+          } else {
+            this.$.createEventToast.open();
+          }
         }
       },
       
@@ -46999,6 +47918,9 @@ Polymer.PaperDatePickerItemBehavior = {
     paper-input {
       padding-bottom: 10px;
     }
+    paper-toast {
+      min-width: 200px;
+    }
     google-map {
       margin-top: 64px;
       height: 300px;
@@ -47051,6 +47973,11 @@ Polymer.PaperDatePickerItemBehavior = {
       z-index: 1;
       color: #ff4081;
       text-shadow: 0px 1px 1px #CA0000;
+      background-color: white;
+      background-color: rgba(255, 255, 255, 0.7);
+    }
+    .back:hover {
+      background-color: white;
     }
     .back::shadow iron-icon {
       -webkit-filter: drop-shadow(0px 2px 1px #CA0000);
@@ -47118,6 +48045,7 @@ Polymer.PaperDatePickerItemBehavior = {
           </div>
         <paper-card>
       </paper-card></paper-card></section>
+      <paper-toast id="saveEventToast" text="Event Saved!"></paper-toast>
       <paper-fab id="editSubmit" noink="" icon="save" title="Save Event" class="fab-event" on-tap="handleSaveEvent"></paper-fab>
       <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
       <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
@@ -47216,6 +48144,7 @@ Polymer.PaperDatePickerItemBehavior = {
         this.eventClone.end = new Date(this.eventClone.end).getTime();
         if(this.$.editForm.validate()){
           this.event = Object.assign({}, this.eventClone);
+          this.$.saveEventToast.open();
         }
       },
       

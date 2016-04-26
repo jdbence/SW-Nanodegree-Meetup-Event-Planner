@@ -18,6 +18,17 @@
 <dom-module id="dialog-event">
   
   <style is="custom-style" include="iron-flex iron-flex-alignment">
+  
+    paper-toolbar.pop {
+      --paper-toolbar-color: black;
+      --paper-toolbar-background: transparent;
+      --paper-toolbar-title: {
+        margin: 0 !important;
+      };
+      margin: 0;
+      padding: 0;
+    }
+    
     paper-dialog {
       max-width: 100%;
       width: 600px;
@@ -27,7 +38,9 @@
     }
     
     paper-dialog section {
+      margin-top: 0;
       width: 100%;
+      overflow-x: hidden;
       overflow-y: auto;
       @apply(--layout-flex);
     }
@@ -67,7 +80,8 @@
       }
     }
     .map-container {
-      position:relative;
+      position: relative;
+      width: 100%;
     }
     .map-container:before {
       content: "";
@@ -91,10 +105,13 @@
     <google-map-search class="picker" map="[[map]]" query="[[location]]" results="{{results}}"></google-map-search>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <paper-dialog id="eventDialog" modal>
+      <paper-toolbar class="pop">
+        <span class="title">Create Event</span>
+        <paper-icon-button icon="close" title="close" dialog-dismiss></paper-icon-button>
+      </paper-toolbar>
       <section>
-        <h2>Create Event</h2>
         <form is="iron-form" id="eventForm" action="/">
-          <paper-input name="type" list="eventList" label="Type" required autoFocus auto-validate error-message="Missing Type!"></paper-input>
+          <paper-input name="type" list="eventList" label="Type" required autofocus auto-validate error-message="Missing Type!"></paper-input>
           <datalist id="eventList">
             <option value="Birthday"></option>
             <option value="Meeting"></option>
@@ -121,8 +138,8 @@
         </form>
       </section>
       <div class="buttons">
-        <paper-button dialog-dismiss>Cancel</paper-button>
-        <paper-button on-tap="handleCreate" id="createSubmit">Create</paper-button>
+        <paper-button on-tap="handleCreate" id="createSubmit" title="Create Event">Create</paper-button>
+        <paper-button on-tap="handleEdit" id="editSubmit" title="Edit Event Details">Edit</paper-button>
       </div>
     </paper-dialog>
   </template>
@@ -158,13 +175,13 @@
         },
         form: {
           type: Object,
-          value: function() {
+          value: function () {
             return this.$.eventForm;
           }
         },
         today: {
           type: String,
-          value: function() {
+          value: function () {
             return this.next30(new Date().getTime());
           }
         },
@@ -174,10 +191,10 @@
       },
       
       listeners: {
-        'iron-overlay-opened': 'handleDialogOpen'
+        'iron-overlay-opened': 'onDialogOpened'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.eventForm.addEventListener('input', this.onFormChange.bind(this));
       },
       
@@ -185,15 +202,29 @@
        * Disable form's submit button when form is invalid
        */
       onFormChange: function () {
-        this.$.createSubmit.disabled = !this.$.eventForm.validate();
+        var valid = !this.$.eventForm.validate();
+        this.$.createSubmit.disabled = valid;
+        this.$.editSubmit.disabled = valid;
       },
       
       /**
-       * Whenever the form is opened update the values
+       * Dialog has opened
+       *
        */
-      handleDialogOpen: function() {
+      onDialogOpened: function (event) {
         this.getLocation();
         this.onFormChange();
+        this.inputFocus(event.target.querySelector('[autofocus]'));
+      },
+      
+      /**
+       * Auto select the first input
+       *
+       */
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
@@ -211,7 +242,7 @@
        * @param {Array} results - Array of Location objects from Google API
        * @returns {Array} - Array of address objects
        */
-      computeResults: function(results) {
+      computeResults: function (results) {
         if(results.length > 0) {
           var loc = results[0];
           this.latitude = loc.latitude;
@@ -225,7 +256,7 @@
        * @param {Array} results - Array of Location objects from Google API
        * @returns {Array} - Array of address strings
        */
-      computeCandidates: function(results) {
+      computeCandidates: function (results) {
         var t = Math.min(results.length, 3);
         var candidates = [];
         var i;
@@ -240,7 +271,7 @@
        * @param {Object} option - Location object from Google API
        * @returns {String} - address of the location
        */
-      computeLocationName: function(option) {
+      computeLocationName: function (option) {
         if(option.formatted_address.indexOf(option.name) != -1) {
           return option.formatted_address;
         }
@@ -250,13 +281,42 @@
       /**
        * Creates a new event if the form is valid
        */
-      handleCreate: function() {
+      handleCreate: function () {
         if(this.$.eventForm.validate()){
-          var data = this.$.eventForm.serialize();
-          var time = new Date(data.start_time).getTime();
           
-          // request to create the event
-          this.fire('create', {
+          this.createEvent(this.$.eventForm.serialize(), false);
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
+        }
+      },
+      
+      /**
+       * Allows the user to advance edit the event
+       *
+       */
+      handleEdit: function () {
+        if(this.$.eventForm.validate()){
+          
+          this.createEvent(this.$.eventForm.serialize(), true);
+          
+          // reset form defaults
+          this.$.eventForm.reset();
+          
+          // close dialog
+          this.$.eventDialog.close();
+        }
+      },
+      
+      createEvent: function (data, open) {
+        var time = new Date(data.start_time).getTime();
+          
+        // request to create the event
+        this.fire('create', {
+          event: {
             //TODO: use name prop after typehead supports property passthrough
             location: this.location, //data.location,
             type: data.type,
@@ -267,14 +327,9 @@
             host: this.host,
             guests: this.host,
             created: Firebase.ServerValue.TIMESTAMP
-          });
-          
-          // reset form defaults
-          this.$.eventForm.reset();
-          
-          // close dialog
-          this.$.eventDialog.close();
-        }
+          },
+          open: open || false
+        });
       },
       
       /**
@@ -289,7 +344,7 @@
        * Returns the users name
        *
        */
-      profileName: function(user) {
+      profileName: function (user) {
         var p = this.userProvider(user);
         return p.displayName ? p.displayName : '';
       },
@@ -298,7 +353,7 @@
        * Returns the users email
        *
        */
-      profileEmail: function(user) {
+      profileEmail: function (user) {
         var p = this.userProvider(user);
         return p.email ? p.email : '';
       },
@@ -307,16 +362,16 @@
        * Sets the default host based on the person logged in
        *
        */
-      handleLogin: function(event) {
+      handleLogin: function (event) {
         this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
       },
       
       /**
        * Attempts to get the lat/long information from the navigator and location from Google API
        */
-      getLocation: function() {
+      getLocation: function () {
         if (navigator && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(function(position) {
+          navigator.geolocation.getCurrentPosition(function (position) {
             var point = position.coords;
             this.latitude = point.latitude;
             this.longitude = point.longitude;
@@ -329,9 +384,9 @@
        * Google API returns the address location about the lat/long
        * @param {Event} event - AJAX reponse from Google API
        */
-      handleGetStreetAddress: function(event) {
+      handleGetStreetAddress: function (event) {
         var results = (event.detail && event.detail.response && event.detail.response.results) ? event.detail.response.results : [];
-        var matched = _.find(results, function(o) { return o.types.indexOf('street_address') >= 0 });
+        var matched = _.find(results, function (o) { return o.types.indexOf('street_address') >= 0 });
         if(matched){
           this.location = matched.formatted_address;
         }
@@ -343,11 +398,11 @@
        * @param {String} type - Expect reponse as 'millisecond' or 'moment'
        * @returns {Number|Moment} - time rounded to the next 30 minutes
        */
-      next30: function(time, type){
+      next30: function (time, type){
       	type = type || 'millisecond';
         var m = moment(time);
         var seconds = m.seconds();
-        var minutes = m.minute()
+        var minutes = m.minute();
         minutes = minutes >= 30 ? 60 - minutes : 30 - minutes;
         m.add(minutes, 'minutes').subtract(seconds, 'seconds');
         
