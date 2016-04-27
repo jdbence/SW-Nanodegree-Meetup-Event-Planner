@@ -363,7 +363,8 @@
        *
        */
       handleLogin: function (event) {
-        this.host = this.profileName(event.detail.user) || this.profileEmail(event.detail.user);
+        var user = event.detail.user;
+        this.host = this.profileName(user) || this.profileEmail(user) || user.provider;
       },
       
       /**
