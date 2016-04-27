@@ -19540,7 +19540,7 @@ value. `setMax` should move the slider to the maximum value.
       <div class$="{{computeLayout(mobile)}}">
         <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="loginPassword"></iron-a11y-keys>
         <form is="iron-form" id="loginForm" action="/">
-          <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email"></gold-email-input>
+          <gold-email-input name="email" required="" auto-validate="" autofocus="" autocomplete="" error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
           <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
           <paper-button on-tap="createAccount" class="link">Don't have an Account?</paper-button>
@@ -19591,6 +19591,7 @@ value. `setMax` should move the slider to the maximum value.
       },
       
       listeners: {
+        'iron-overlay-opened': 'onDialogOpened',
         'iron-overlay-closed': 'onDialogClosed',
         'iron-form-invalid': 'onInputChange'
       },
@@ -19616,6 +19617,15 @@ value. `setMax` should move the slider to the maximum value.
       },
       
       /**
+       * Auto select the first input
+       *
+       */
+      onDialogOpened: function() {
+        var input = event.target.querySelector('[autofocus]');
+        input.$.input.focus();
+      },
+      
+      /**
        * Hide any error messages
        *
        */
@@ -19629,7 +19639,7 @@ value. `setMax` should move the slider to the maximum value.
        */
       loginPassword: function() {
         this.provider = 'password';
-        this.$.firebaseLogin.login(this.$.loginForm.serialize())
+        this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
       
       /**
@@ -25250,7 +25260,7 @@ of where they are in DOM.
         <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="createUser"></iron-a11y-keys>
         <form is="iron-form" id="registerForm" action="/">
           <paper-input name="name" label="Name" required="" auto-validate="" autofocus="" minlength="2" error-message="Atleast 2 characters"></paper-input>
-          <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email"></gold-email-input>
+          <gold-email-input name="email" required="" auto-validate="" autocomplete="" error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required="" auto-validate="" minlength="5" error-message="Invalid Password"></paper-input>
           <paper-input name="employer" label="Employer (optional)"></paper-input>
           <paper-button on-tap="createUser" class="simple register" id="registerSubmit">Register</paper-button>
@@ -25298,6 +25308,7 @@ of where they are in DOM.
       },
       
       listeners: {
+        'iron-overlay-opened': 'onDialogOpened',
         'iron-overlay-closed': 'onDialogClosed',
         'iron-form-invalid': 'onInputChange'
       },
@@ -25320,6 +25331,15 @@ of where they are in DOM.
        */
       computeLayout: function(mobile) {
         return 'layout inner ' + (mobile ? 'vertical justified' : 'horizontal');
+      },
+      
+      /**
+       * Auto select the first input
+       *
+       */
+      onDialogOpened: function() {
+        var input = event.target.querySelector('[autofocus]');
+        input.$.input.focus();
       },
       
       /**
