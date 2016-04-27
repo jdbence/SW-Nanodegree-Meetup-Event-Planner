@@ -129,7 +129,7 @@
       <div class$="{{computeLayout(mobile)}}">
         <iron-a11y-keys id="a11y" target="[[form]]" keys="enter" on-keys-pressed="loginPassword"></iron-a11y-keys>
         <form is="iron-form" id="loginForm" action="/">
-          <gold-email-input name="email" required auto-validate autoFocus autocomplete error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
+          <gold-email-input name="email" required auto-validate autofocus autocomplete error-message="Invalid Email" regex="[^@\s]+@[^@\s]+\.[^@\s]+"></gold-email-input>
           <paper-input name="password" type="password" label="Password" required auto-validate minLength="5" error-message="Invalid Password"></paper-input>
           <paper-button on-tap="loginPassword" class="simple login" id="loginSubmit">Sign In</paper-button>
           <paper-button on-tap="createAccount" class="link">Don't have an Account?</paper-button>
@@ -173,7 +173,7 @@
         
         form: {
           type: Object,
-          value: function() {
+          value: function () {
             return this.$.loginForm;
           }
         }
@@ -185,7 +185,7 @@
         'iron-form-invalid': 'onInputChange'
       },
       
-      ready: function(){
+      ready: function (){
         this.$.loginForm.addEventListener('input', this.onInputChange.bind(this));
       },
       
@@ -201,24 +201,33 @@
        * Returns the layout classes depending on mobile/desktop
        *
        */
-      computeLayout: function(mobile) {
+      computeLayout: function (mobile) {
         return 'layout inner ' + (mobile ? '' : 'horizontal');
+      },
+      
+      /**
+       * Dialog has opened
+       *
+       */
+      onDialogOpened: function (event) {
+        this.inputFocus(event.target.querySelector('[autofocus]'));
       },
       
       /**
        * Auto select the first input
        *
        */
-      onDialogOpened: function() {
-        var input = event.target.querySelector('[autofocus]');
-        input.$.input.focus();
+      inputFocus: function (input) {
+        this.async(function (){
+          input.$.input.focus();
+        }, 200);
       },
       
       /**
        * Hide any error messages
        *
        */
-      onDialogClosed: function() {
+      onDialogClosed: function () {
         this.$.collapse.hide();
       },
       
@@ -226,7 +235,7 @@
        * Request password login
        *
        */
-      loginPassword: function() {
+      loginPassword: function () {
         this.provider = 'password';
         this.$.firebaseLogin.login(this.$.loginForm.serialize());
       },
@@ -235,7 +244,7 @@
        * Request Google SSO
        *
        */
-      loginGoogle: function(e) {
+      loginGoogle: function (e) {
         this.provider = 'google';
         this.$.firebaseLogin.login();
       },
@@ -244,7 +253,7 @@
        * Something went wrong with the Firebase request
        *
        */
-      errorHandler: function(e) {
+      errorHandler: function (e) {
         this.message = e.detail.message;
         this.$.collapse.show();
       },
@@ -253,7 +262,7 @@
        * Open the registration dialog
        *
        */
-      createAccount: function() {
+      createAccount: function () {
         this.$.loginDialog.close();
         
         var dialog = document.getElementById('registerDialog');

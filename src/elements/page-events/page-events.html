@@ -1,7 +1,9 @@
 <link rel="import" href="../../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../../bower_components/firebase-element/firebase-collection.html">
 <link rel="import" href="../../../bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="../../../bower_components/paper-button/paper-button.html">
 <link rel="import" href="../../../bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="../../../bower_components/paper-toast/paper-toast.html">
 <link rel="import" href="../../../bower_components/paper-date-picker/paper-date-picker.html">
 <link rel="import" href="../../../bower_components/app-layout/app-layout.html">
 <link rel="import" href="../../../bower_components/iron-icon/iron-icon.html">
@@ -37,6 +39,10 @@
     paper-card {
       width: 100%;
     }
+    paper-toast {
+      min-width: 200px;
+    }
+    
     .fab-event {
       margin: 20px;
       position: fixed;
@@ -97,7 +103,8 @@
         <paper-fab noink icon="add" title="Add Event" class="fab-event" data-dialog="eventDialog" on-tap="handleOpenDialog"></paper-fab>
       </app-header-layout>
     </app-drawer-layout>
-    <iron-signals on-iron-signal-logout-success="handleLogout"></iron-signals>
+    <paper-toast id="createEventToast" text="Event Created!"></paper-toast>
+    <iron-signals on-iron-signal-logout="handleLogout"></iron-signals>
     <iron-signals on-iron-signal-login-success="handleLogin"></iron-signals>
     <dialog-event></dialog-event>
   </template>
@@ -165,7 +172,14 @@
        */
       handleCreateEvent: function(e) {
         if(e.detail) {
-          this.$.eventCollection.add(e.detail);
+          var query = this.$.eventCollection.add(e.detail.event);
+          // auto open the event page
+          if (e.detail.open) {
+            var key = query.path.u[3];
+            this.fire('iron-signal', {name: 'url', data: '/event/' + key});
+          } else {
+            this.$.createEventToast.open();
+          }
         }
       },
       
